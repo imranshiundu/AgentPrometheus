@@ -43,4 +43,6 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Implemented **Multi-API Fallbacks** and **Hot-Swap** logic in LiteLLM (The Uncrashable Shield).
 - [Action] Integrated the **Triage Agent** for dynamic, heuristic task routing.
 - [Action] Refactored `README.md` into a high-level branding and value-prop dashboard.
-- [Milestone] Agent Prometheus Project Completed. Repository Cleaned and Pushed.
+- [Action] Created `HARDWARE_SPECS.md` with VPS/device requirements.
+- [Action] Updated `AGENT_ABILITIES.md` with the "Freight Train vs. Motorcycle" definitive comparison.
+- [Milestone] Agent Prometheus Project Completed. Final Documentation Cleaned and Pushed.

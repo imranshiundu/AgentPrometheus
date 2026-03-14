@@ -1,58 +1,47 @@
-# Agent Prometheus: Abilities & Synergies
+# Agent Prometheus: Master Capabilities & Competitive Analysis
 
-Agent Prometheus is not a simple chatbot; it is a **Meta-Framework** designed for high-reasoning, autonomous execution, and cross-domain adaptation.
+## 🔱 Master Capabilities List
 
-## 1. Individual Component Superpowers
-By integrating these four heavyweights, Prometheus inherits their deep mastery:
+When combining AutoGPT, OpenHands, crewAI, and gpt-engineer with our V5 architectural upgrades, Agent Prometheus achieves the following:
 
-- **AutoGPT (The Explorer):** Mastery in "Chain of Thought" browsing. It doesn't just search; it reads, reflects, and pivots.
-- **OpenHands (The Artisan):** Specialized in terminal-level precision. It can install dependencies, run tests, and fix runtime errors in real-time.
-- **gpt-engineer (The Architect):** Experts in "One-Prompt Coding." It translates vague human desires into professional, standard-compliant repo structures.
-- **crewAI (The Strategist):** The glue. It brings role-based discipline, task delegation, and hierarchical oversight.
+### 1. Autonomous Web Intelligence (The Scout)
+- Scrape live websites, bypass basic captchas, and read technical documentation.
+- Download, read, and summarize massive PDFs or CSVs.
+- Monitor specific URLs for changes or keyword mentions.
 
----
+### 2. End-to-End Software Engineering (The Specialist & Architect)
+- Generate entire folder structures and boilerplate for new apps from a single prompt.
+- Write production-ready code in Python, JavaScript, TypeScript, Go, etc.
+- Execute terminal commands inside a secure, sandboxed Docker environment.
+- Install dependencies (`pip`, `npm`, `brew`) and test the code it writes.
+- Read compiler errors, debug tracebacks autonomously, and rewrite broken functions.
 
-## 2. Synergistic Abilities (What they do together)
-When these "organs" work in one body, Prometheus achieves feats no single framework can:
-
-### **The "Auto-Correction" Pipeline**
-1. **Architect** (gpt-engineer) designs the skeleton.
-2. **Specialist** (OpenHands) writes the code.
-3. **Scout** (AutoGPT) searches for the specific API documentation the Specialist needs.
-4. If a bug occurs, the Specialist fixes it while the Scout finds a more efficient library on GitHub.
-
-### **The "Knowledge-Action" Bridge**
-Prometheus can find a problem on the internet (AutoGPT), design a tool to fix it (gpt-engineer), and deploy that tool to a server (OpenHands) all within a single orchestrated session (crewAI).
+### 3. Cognitive & Architectural Orchestration
+- Break down massive natural language prompts into a step-by-step execution plan.
+- Enforce strict compliance with a `SPEC.md` file (Anti-Hallucination).
+- Review code written by sub-agents and reject it if it fails testing criteria.
 
 ---
 
-## 3. Multi-Scenario Adaptation
-Prometheus is domain-agnostic. The "Trinity" agents switch roles based on the user's current scenario:
+## 🆚 Prometheus vs. OpenClaw: The "Freight Train" vs. the "Motorcycle"
 
-| Scenario | Architect (Titan) | Specialist (Hephaestus) | Scout (Hermes) |
-| :--- | :--- | :--- | :--- |
-| **Development** | Frontend/Backend Scaffolder | Code Writer & Debugger | Tech Doc Researcher |
-| **Marketing** | Campaign Structurer | Automated Social Poster | Market/Trend Analyst |
-| **Research** | Dissertation/Paper Outline | Data Processor (Python) | Deep Web Fact-Finder |
-| **Enterprise** | Business Logic Designer | ERP/CRM Integrator | Competitor Intelligence |
+Yes, Agent Prometheus is **exponentially heavier** than OpenClaw. It is not even a close comparison. 
 
----
+**If OpenClaw is a high-speed motorcycle, Agent Prometheus is a diesel-powered freight train.**
 
-## 4. Agent Prometheus vs. OpenClaw
+### 1. Resource Consumption (The "Heaviness")
+-   **OpenClaw:** Extremely light. Runs as a single Node.js process. Requires low RAM (4GB-8GB).
+-   **Agent Prometheus:** Extremely heavy. Requires a Vector DB (ChromaDB), a routing proxy (LiteLLM), an orchestrator (crewAI), and multiple sandboxed Docker containers. You realistically need 16GB RAM to prevent OOM errors.
 
-### **Can Prometheus "Beat" OpenClaw?**
-The answer is: **They play different sports.**
+### 2. The Core Purpose
+-   **OpenClaw is a Personal Assistant:** Built to be a "companion" in your messaging apps. Excels at horizontal, day-to-day tasks like email, calendar, and smart home control.
+-   **Agent Prometheus is an Engineering Team:** An enterprise-grade scaffolding and engineering system. You use Prometheus when you need a machine to research documentation, build a React frontend, and write a Python backend until the app works.
 
-- **OpenClaw** is a "Super-Assistant." It is incredible at **Operational Execution**—managing your email, WhatsApp, calendar, and daily tasks with high reliability and a user-friendly interface. It's the "Ultimate Personal Butler."
-- **Agent Prometheus** is a "Titan-Class Engine." It is built for **Complex Reasoning and Engineering.** It is better at building entire software products from scratch, performing multi-stage autonomous research, and handling technical "dirty work" like debugging and scaffolding.
+### 3. Execution & Sandboxing
+-   **OpenClaw (High Risk, Fast):** Runs directly on your host machine. Fast, but a security nightmare if misconfigured. If it makes a mistake, it happens on your actual hard drive.
+-   **Agent Prometheus (Isolated, Secure):** Delegates tasks to OpenHands, which runs inside an isolated Docker sandbox. If the AI writes a malicious script, it only destroys the disposable sandbox, not your computer.
 
-**The Verdict:**
-If you want an assistant to manage your life via Telegram, use **OpenClaw**.
-If you want a machine to **Build, Research, and Innovate** at a Senior Developer/Analyst level, use **Agent Prometheus**.
+### Summary: Which one should you use?
+If you want an AI that **lives in WhatsApp, manages your daily life, and costs very little to host**, use **OpenClaw**.
 
-### **The "Spec Guardian" Power (Enforcement)**
-To prevent "Frankenstein logic" and "Spec Drift," Agent Prometheus uses the **Spec Guardian** role to enforce the AI-Optimized `SPEC.md`.
-
-- **Anti-Hallucination Directives:** By explicitly defining "OUT OF SCOPE" features, we stop agents from building unrequested UIs or databases.
-- **Structural Lockdown:** The "Required File Structure" ensures that when **gpt-engineer** hands off to **OpenHands**, the coding agent knows exactly which entry points to use.
-- **Hard Acceptance Criteria:** The Specialist's job isn't done based on an opinion, but based on a 100% pass rate in the PyTest suite defined by the Architect.
+But if you want an AI that **builds complex software from scratch, debugs its own code, and acts as a tireless junior developer**, you need the heavy, multi-agent architecture of **Prometheus**.

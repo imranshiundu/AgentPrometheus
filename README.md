@@ -1,10 +1,7 @@
-# Agent Prometheus 🔱
-
-![Agent Prometheus Logo](logo.png)
-
-**The Titan-Class AI Orchestrator & Self-Improving Hive Mind.**
-
 Agent Prometheus is a high-performance Meta-Framework that unifies the world's most specialized AI agents—**AutoGPT, OpenHands, crewAI, and gpt-engineer**—into a single, uncrashable entity.
+
+> [!IMPORTANT]
+> **Marketing Note:** If OpenClaw is a high-speed motorcycle, **Agent Prometheus is a diesel-powered freight train.** It is exponentially heavier, more secure, and built for heavy-duty engineering rather than personal assistance.
 
 ---
 
@@ -32,7 +29,8 @@ Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes task
 
 ## 📖 Project Documentation
 - [System Architecture](SYSTEM_ARCHITECTURE.md) - **Triage, Hot-Swaps, and M2M Protocols.**
-- [Agent Abilities](AGENT_ABILITIES.md) - **Synergies between AutoGPT, OpenHands, and CrewAI.**
+- [Agent Abilities](AGENT_ABILITIES.md) - **Master Capabilities & OpenClaw Comparison.**
+- [Hardware Specs](HARDWARE_SPECS.md) - **VPS Requirements & Device Compatibility.**
 - [Honest Abilities](HONEST_ABILITIES.md) - **Wait, what *can't* it do? (Reality check).**
 - [API Orchestration](API_ORCHESTRATION.md) - **Configuring the LiteLLM Key Chain.**
 - [Development Log](PROMETHEUS_LOG.md) - **Chronicle of the Titan's Forge.**
