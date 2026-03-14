@@ -20,7 +20,6 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Enforced strict **loop guardrails** (`max_iter=5`) across all agents.
 - [Action] Initialized `global_state.json` (The Shared Memory Layer).
 - [Action] **Architecture V3 Overhaul:** Shifted to a **Microservices-Based Agent Architecture**.
-- [Action] Established the **Single Source of Truth (SSoT)** protocol via `SPEC_TEMPLATE.md`.
-- [Action] Implemented the **Spec Guardian (QA Agent)** to enforce hard boundaries and prevent "Out-of-Scope" drift.
-- [Action] Integrated Test-Driven Development (TDD) as the primary definition of "Done."
+- [Action] Established the **Single Source of Truth (SSoT)** protocol via the AI-Optimized `SPEC_TEMPLATE.md`.
+- [Action] Integrated the "Anti-Hallucination Directive" logic into the Spec Guardian's review criteria.
 - [Next Step] Final system verification with the new microservices service handlers.

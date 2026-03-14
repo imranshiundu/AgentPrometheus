@@ -50,7 +50,9 @@ The answer is: **They play different sports.**
 If you want an assistant to manage your life via Telegram, use **OpenClaw**.
 If you want a machine to **Build, Research, and Innovate** at a Senior Developer/Analyst level, use **Agent Prometheus**.
 
-### **The "Prometheus Advantage":**
-1. **Modular Brain:** We can swap the backend (OpenAI to Anthropic) in seconds.
-2. **Infinite Skills:** Because we have OpenHands, Prometheus can *write its own tools* when it doesn't have a skill, whereas OpenClaw relies more on pre-defined skills.
-3. **Hierarchical Review:** Prometheus has a built-in "Manager" layer (crewAI) that critiques the work of the other agents, whereas OpenClaw typically follows a linear command-response loop.
+### **The "Spec Guardian" Power (Enforcement)**
+To prevent "Frankenstein logic" and "Spec Drift," Agent Prometheus uses the **Spec Guardian** role to enforce the AI-Optimized `SPEC.md`.
+
+- **Anti-Hallucination Directives:** By explicitly defining "OUT OF SCOPE" features, we stop agents from building unrequested UIs or databases.
+- **Structural Lockdown:** The "Required File Structure" ensures that when **gpt-engineer** hands off to **OpenHands**, the coding agent knows exactly which entry points to use.
+- **Hard Acceptance Criteria:** The Specialist's job isn't done based on an opinion, but based on a 100% pass rate in the PyTest suite defined by the Architect.
