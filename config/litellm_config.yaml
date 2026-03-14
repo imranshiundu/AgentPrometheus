@@ -1,21 +1,34 @@
 model_list:
-  - model_name: gpt-4
+  # Tier 1: High Reasoning (Orchestration & Critical Coding)
+  - model_name: high-reasoning-model
     litellm_params:
-      model: openai/gpt-4
-      api_key: "os.environ/REAL_API_KEY"
-  - model_name: claude-3-opus
-    litellm_params:
-      model: anthropic/claude-3-opus-20240229
+      model: anthropic/claude-3-5-sonnet-20240620
       api_key: "os.environ/ANTHROPIC_API_KEY"
-  - model_name: gemini-pro
+      extra_headers:
+        anthropic-beta: "prompt-caching-2024-05-22"
+
+  - model_name: manager-model
     litellm_params:
-      model: gemini/gemini-pro
-      api_key: "os.environ/GEMINI_API_KEY"
-  - model_name: gpt-3.5-turbo
-    litellm_params:
-      model: openai/gpt-3.5-turbo
+      model: openai/gpt-4o
       api_key: "os.environ/REAL_API_KEY"
 
-general_settings:
-  master_key: "sk-prometheus-master-key"
-  disable_on_budget_exceeded: true
+  # Tier 2: Specialized Execution (Reliable Coding)
+  - model_name: coding-model
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-20240620
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+
+  # Tier 3: Speed & Economy (Research, Scaffolding, Summarization)
+  - model_name: economy-model
+    litellm_params:
+      model: google/gemini-1.5-flash
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: scaffolding-model
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: "os.environ/REAL_API_KEY"
+
+router_settings:
+  routing_strategy: simple-shuffle # Can be usage-based for more complex setups
+  enable_prompt_caching: true

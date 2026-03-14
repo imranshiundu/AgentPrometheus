@@ -1,89 +1,72 @@
-# Agent Prometheus: The Titan-Class AI Orchestrator
+# Agent Prometheus: The Titan-Class AI Orchestrator (V2)
 
 ![Agent Prometheus Logo](logo.png)
 
-Agent Prometheus is a hierarchical Multi-Agent System (MAS) that unifies **AutoGPT, OpenHands, crewAI, and gpt-engineer** into a single, cohesive entity. It brings the "fire" of autonomous research and specialized coding to your local environment through a central cognitive core.
+Agent Prometheus is a hierarchical Multi-Agent System (MAS) that unifies the specialized capabilities of **AutoGPT, OpenHands, crewAI, and gpt-engineer**. 
 
-## 🛠 Prerequisites
-
-Regardless of your Operating System, ensure the following are installed:
-
-- **Git** (for version control)
-- **Docker & Docker Compose** (Recommended for isolation)
-- **Python 3.10 or higher** (If running natively)
-- **OpenAI API Key** (A single key is used via the LiteLLM Gateway)
+In its V2 evolution, Prometheus has moved from a "Framework Integration" model to a **"Modular Tool Intelligence"** model, drastically reducing token consumption and architecture bloat.
 
 ---
 
-## 🚀 Setup Instructions
+## ⚡ V2 Optimizations (Efficiency & Stability)
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/imranshiundu/AgentPrometheus.git
-cd AgentPrometheus
-```
+### 1. Tiered Intelligence Routing
+Prometheus no longer uses expensive models for every task. We route traffic through the **LiteLLM Gateway** based on specific agent needs:
+- **High Reasoning (Manager/QA):** GPT-4o or Claude 3.5 Sonnet.
+- **Precision (Coding):** Claude 3.5 Sonnet (Best-in-class syntax).
+- **Utility (Research/Refining):** Gemini 1.5 Flash or GPT-4o-Mini (Extreme cost savings).
 
-### 2. Environment Configuration
-Create a `.env` file in the root directory:
-```bash
-# General
-REAL_API_KEY=your_openai_api_key_here
+### 2. The Refiner Agent (Token Caching)
+We have introduced a **"Refiner"** agent between every handover. This agent's only role is to compress the outputs in the shared workspace into strict JSON or concise bullet points, preventing the "Telephone Game" context window bloat.
 
-# Optional: Docker settings
-DOCKER_DEFAULT_PLATFORM=linux/amd64
-```
+### 3. Loop Guardrails & Timeouts
+Every Titan (Architect, Specialist, Scout) now has a hard-coded `max_iter` limit (typically 5 iterations). This prevents the system from getting stuck in infinite "research loops" that burn API credits.
 
-### 3. Deployment Method
-
-#### Option A: Docker (Recommended - All OS)
-*Best for avoiding dependency conflicts across frameworks.*
-```bash
-docker-compose up -d
-```
-
-#### Option B: Linux/macOS Native
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install crewai langchain-openai litellm python-dotenv
-```
-
-#### Option C: Windows Native (PowerShell)
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install crewai langchain-openai litellm python-dotenv
-```
+### 4. Shared Memory Layer
+Prometheus now utilizes a `global_state.json` inside the shared workspace to maintain a persistent state of the project, ensuring that reasoning context isn't lost when switching between different framework modules.
 
 ---
 
 ## 🏗 System Architecture & Specs
 
 ### Agent Ability Matrix
-| Agent | Role | Capability | Powered By |
+| Agent | Role | LLM Tier | Primary Framework |
 | :--- | :--- | :--- | :--- |
-| **Architect (Titan)** | Structural Design | Project Scaffolding / Campaign Outlining | gpt-engineer |
-| **Specialist (Hephaestus)** | Execution | Coding, Debugging & Data Processing | OpenHands |
-| **Scout (Hermes)** | Intelligence | Autonomous Web & Market Research | AutoGPT |
-| **Orchestrator** | Management | Multi-Scenario Delegation & QA | crewAI |
+| **Architect (Titan)** | Structural Design | Economy | gpt-engineer |
+| **Specialist (Hephaestus)** | Execution | Precision | OpenHands |
+| **Scout (Hermes)** | Intelligence | Economy | AutoGPT |
+| **Refiner** | Optimization | Economy | Integration Logic |
+| **Orchestrator** | Management | High-Reasoning | crewAI (Manager) |
 
-### Why Agent Prometheus?
-While tools like **OpenClaw** excel at operational personal assistance (Email, WhatsApp, Calendar), **Agent Prometheus** is a "Reasoning Forge." It is designed to **build, research, and innovate**. 
+---
 
-- **Adaptive Scenarios:** Whether you are a Marketer, Researcher, or Developer, the Prometheus Trinity adapts its roles to your domain.
-- **Auto-Correction:** The Specialist can fix code errors that the Scout finds documentation for in real-time.
-- **Single Identity:** Powered by a LiteLLM Gateway for unified cost and key management.
+## 🚀 Setup Instructions
+
+### 1. Environment Configuration
+Create a `.env` file in the root directory:
+```bash
+# Providers (Only fill what you use)
+REAL_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+GEMINI_API_KEY=your_gemini_key
+```
+
+### 2. Launch Infrastructure
+```bash
+docker-compose up -d
+```
+*Note: V2 enables **Prompt Caching** by default via LiteLLM to reduce costs for repetitive system prompts.*
 
 ---
 
 ## 📖 Operational Documentation
-- [System Architecture](SYSTEM_ARCHITECTURE.md) - Deep dive into the execution lifecycle.
-- [Agent Abilities](AGENT_ABILITIES.md) - Specialized superpowers of each framework.
-- [API Orchestration](API_ORCHESTRATION.md) - Detailed guide on the single-key setup.
-- [Development Log](PROMETHEUS_LOG.md) - Changelog and technical decisions.
+- [System Architecture](SYSTEM_ARCHITECTURE.md) - Deep dive into the V2 execution lifecycle.
+- [Agent Abilities](AGENT_ABILITIES.md) - Updated for the new "Refiner" and "Summarizer" roles.
+- [API Orchestration](API_ORCHESTRATION.md) - Guide to the Tiered Routing and LiteLLM Proxy.
+- [Development Log](PROMETHEUS_LOG.md) - The chronicle of the V2 refactor.
 
 ## 🧹 Maintenance
-To clean up shared workspace artifacts:
+To reset the global state and workspace:
 ```bash
 rm -rf shared_workspace/*
 ```
@@ -91,4 +74,4 @@ rm -rf shared_workspace/*
 ---
 
 ## 🛡 License
-This project is open-source. See the individual sub-directory licenses for AutoGPT, OpenHands, and crewAI specific terms.
+This project is open-source. Forged for builders who want the power of all agents with the cost of only one.
