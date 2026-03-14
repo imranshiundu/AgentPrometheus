@@ -39,6 +39,8 @@ Before starting, ensure you have the following installed:
     docker-compose up -d
     source venv/bin/activate
     python telegram_gateway.py
+    # In another terminal:
+    python prometheus_manager.py
     ```
 
 ---
@@ -62,6 +64,8 @@ Before starting, ensure you have the following installed:
     docker-compose up -d
     source venv/bin/activate
     python telegram_gateway.py
+    # In another terminal:
+    python prometheus_manager.py
     ```
 
 ---

@@ -33,20 +33,13 @@ Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes task
 
 ---
 
-## 🚀 Quick Start
+### 🛠 Launch Sequence
+1. **Forge the Titan:** `chmod +x setup.sh && ./setup.sh`
+2. **Ignite the Pulse:** `docker-compose up -d`
+3. **Open the Gates:** `python telegram_gateway.py`
+4. **Awaken the Brain:** `python prometheus_manager.py` (Run in a separate shell)
 
-1. **Clone & Setup:**
-   ```bash
-   git clone https://github.com/imranshiundu/AgentPrometheus.git
-   cd AgentPrometheus
-   ./setup.sh
-   ```
-2. **Configure:** Update the `.env` file with your API keys.
-3. **Launch:**
-   ```bash
-   docker-compose up -d
-   python telegram_gateway.py
-   ```
+*Once running, go to Telegram and send `/start`.*
 
 ---
 
@@ -63,10 +56,7 @@ Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes task
 
 ---
 
-## 🚀 Deployment
-1. Set up your `.env` with OpenAI, Anthropic, or Gemini keys.
-2. Run `docker-compose up -d`.
-3. Launch `python telegram_gateway.py` to start the Front Desk.
+
 
 ---
 **Forged for those who don't just want an assistant, but a machine that builds.**
