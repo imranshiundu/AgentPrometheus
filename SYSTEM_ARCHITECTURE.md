@@ -1,46 +1,37 @@
-# System Architecture: Agent Prometheus (V2)
+# System Architecture: Agent Prometheus (V3)
 
-This document outlines the **Modular Tool Intelligence** model, which replaces the high-bloat "Framework Chaining" approach.
+The V3 architecture shifts from a "Shared Local Script" to a **Microservices-Based Agent Architecture**. 
 
-## 1. The Modular Philosophy
-Rather than running four heavy, competing frameworks in full, Prometheus V2 treats them as **specialized toolsets** managed by a central **Hierarchical Orchestrator** (crewAI).
+![Microservices Architecture](microservices_architecture.png)
 
-### The "Frankenstein" Fix:
-- **Decomposition:** We don't call the "AutoGPT App"; we use its autonomous search logic inside a crewAI Agent.
-- **Interoperability:** Communication is no longer just "files on a disk." We use **Strict JSON Handshakes** and a **Centralized Refiner** to ensure context is never lost or misunderstood.
+## 1. The Microservices Model
+Instead of gutting the frameworks, Prometheus V3 treats each framework as an isolated, high-performance API. This preserves their internal reasoning loops (like OpenHands' event-stream architecture) while allowing the Orchestrator to maintain control.
 
-## 2. The Tiered Execution Lifecycle
+### Inter-Agent Communication:
+- **Protocol:** JSON-Over-HTTP (Internal Docker Network).
+- **Payload Example:** `{"task": "build_login_component", "spec_file": "SPEC.md"}`.
 
-### Phase I: The Structural Blueprint (Economy Tier)
-- **Goal:** Minimize cost for boilerplate. 
-- **Action:** The Architect (gpt-engineer logic) uses **GPT-4o-Mini** to generate the folder structure.
+## 2. Guarding the Spec (The SSoT)
+To prevent "requirement drift," Agent Prometheus enforces a **Single Source of Truth (SSoT)**.
 
-### Phase II: The Refiner Cycle (Efficiency Tier)
-- **Action:** Before any data moves from the Architect to the Specialist, the **Refiner** (Gemini Flash) summarizes the requirements. This keeps the prompt history clean and leverages **Prompt Caching**.
+### The Spec Guardian (QA Agent)
+We have introduced a **Spec Guardian** agent. This agent does not write code. Its only job is to compare the Specialist's output against the `SPEC.md`. If the output violates a "HARD CONSTRAINT" or includes "OUT OF SCOPE" features, the Guardian rejects the PR.
 
-### Phase III: The Forge (Precision Tier)
-- **Action:** The Specialist (OpenHands logic) implements the code using **Claude 3.5 Sonnet**. If errors occur, it retrieves research via the Scout.
+### Test-Driven Development (TDD)
+The Architect (Titan) is now tasked with generating a test suite (`/tests`) **before** the Specialist begins coding. The definition of "Done" is no longer an LLM's opinion, but a passing test suite.
 
-### Phase IV: Hierarchy & QA (Reasoning Tier)
-- **Action:** A dedicated **Manager Agent** (crewAI) reviews every step. It has a `max_iter=5` safety floor to prevent infinite loops.
-
-## 3. Data Flow Diagram (V2)
+## 3. Data Flow Diagram (V3)
 
 ```mermaid
 graph TD
-    User([User Prompt]) --> Manager[crewAI Manager - GPT-4o]
-    Manager -->|Scaffold| Architect[Architect - GPT-4o-Mini]
-    Architect -->|Raw Output| Refiner[Refiner - Gemini Flash]
-    Refiner -->|Compressed JSON| WS[(Global State JSON)]
+    User([User Prompt]) --> Manager[crewAI Manager]
+    Manager -->|Define Spec| Architect[Architect - gpt-engineer]
+    Architect -->|Write| SpecFile[SPEC.md & tests/]
     
-    Manager -->|Code| Specialist[Specialist - Claude 3.5 Sonnet]
-    Specialist <-->|Debug| Scout[Scout - Gemini Flash]
+    Manager -->|Execute| Specialist[Specialist - OpenHands API]
+    Specialist -->|Code Output| QA[Spec Guardian - QA Agent]
     
-    WS --> Manager
-    Manager -->|Final Product| User
+    SpecFile --> QA
+    QA -->|Validate| Specialist
+    QA -->|Approval| User
 ```
-
-## 4. Key Performance Indicators (KPIs)
-- **Token Efficiency:** ~60% reduction compared to V1 via Refiner & Tiered Routing.
-- **Stability:** 100% loop-prevention via strict `max_iter` enforcement.
-- **Context Depth:** Persistent `global_state.json` ensures the Specialist knows the Architect's "why" as well as the "what."

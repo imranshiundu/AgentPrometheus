@@ -8,22 +8,20 @@ In its V2 evolution, Prometheus has moved from a "Framework Integration" model t
 
 ---
 
-## ⚡ V2 Optimizations (Efficiency & Stability)
+## 🔱 V3 Evolution: Microservices & SSoT
 
-### 1. Tiered Intelligence Routing
-Prometheus no longer uses expensive models for every task. We route traffic through the **LiteLLM Gateway** based on specific agent needs:
-- **High Reasoning (Manager/QA):** GPT-4o or Claude 3.5 Sonnet.
-- **Precision (Coding):** Claude 3.5 Sonnet (Best-in-class syntax).
-- **Utility (Research/Refining):** Gemini 1.5 Flash or GPT-4o-Mini (Extreme cost savings).
+Agent Prometheus has evolved from basic integration to a **Microservices-Based Agent Architecture**. This preserves the "magic" of framework-specific reasoning loops while enforcing a **Single Source of Truth (SSoT)**.
 
-### 2. The Refiner Agent (Token Caching)
-We have introduced a **"Refiner"** agent between every handover. This agent's only role is to compress the outputs in the shared workspace into strict JSON or concise bullet points, preventing the "Telephone Game" context window bloat.
+### 1. Spec-Driven Development
+Prometheus no longer codes from generic prompts. The process is now strictly controlled:
+- **Phase 1: Spec Generation:** The Architect generates a strict `SPEC.md`.
+- **Phase 2: TDD Preparation:** The Architect generates failing tests *before* coding begins.
+- **Phase 3: Service Execution:** specialized frameworks (OpenHands, AutoGPT) are treated as **APIs**, preserving their internal brilliance.
+- **Phase 4: The Spec Guardian:** A QA agent audits all work against the `SPEC.md`. If a feature is "Out-of-Scope," it is rejected.
 
-### 3. Loop Guardrails & Timeouts
-Every Titan (Architect, Specialist, Scout) now has a hard-coded `max_iter` limit (typically 5 iterations). This prevents the system from getting stuck in infinite "research loops" that burn API credits.
-
-### 4. Shared Memory Layer
-Prometheus now utilizes a `global_state.json` inside the shared workspace to maintain a persistent state of the project, ensuring that reasoning context isn't lost when switching between different framework modules.
+### 2. Architecture Comparison
+![Microservices Architecture](microservices_architecture.png)
+Prometheus utilizes a Microservices-style approach (left) to ensure failure in one agent doesn't bring down the Titan.
 
 ---
 

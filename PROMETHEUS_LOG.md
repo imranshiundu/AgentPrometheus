@@ -19,4 +19,8 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Added the **Refiner Agent** to compress context and save tokens.
 - [Action] Enforced strict **loop guardrails** (`max_iter=5`) across all agents.
 - [Action] Initialized `global_state.json` (The Shared Memory Layer).
-- [Next Step] Final system verification with the new tiered model routing.
+- [Action] **Architecture V3 Overhaul:** Shifted to a **Microservices-Based Agent Architecture**.
+- [Action] Established the **Single Source of Truth (SSoT)** protocol via `SPEC_TEMPLATE.md`.
+- [Action] Implemented the **Spec Guardian (QA Agent)** to enforce hard boundaries and prevent "Out-of-Scope" drift.
+- [Action] Integrated Test-Driven Development (TDD) as the primary definition of "Done."
+- [Next Step] Final system verification with the new microservices service handlers.

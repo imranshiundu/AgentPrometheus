@@ -6,113 +6,68 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- TIERED INTELLIGENCE CONFIGURATION ---
-# We point to the LiteLLM Proxy but request specific "roles" we defined in config.yaml
+# --- V3 ARCHITECTURE: MICROSERVICES & SPEC GUARDIANS ---
 
-# The Manager: High reasoning (GPT-4o or Claude 3.5 Sonnet)
-manager_llm = ChatOpenAI(
-    model="manager-model",
-    openai_api_base="http://litellm:4000/v1",
-    openai_api_key="sk-prometheus-dummy-key"
-)
+llm_manager = ChatOpenAI(model="manager-model", openai_api_base="http://litellm:4000/v1")
+llm_economy = ChatOpenAI(model="economy-model", openai_api_base="http://litellm:4000/v1")
+llm_coding = ChatOpenAI(model="coding-model", openai_api_base="http://litellm:4000/v1")
 
-# The Coder: Specialized in syntax (Claude 3.5 Sonnet)
-coding_llm = ChatOpenAI(
-    model="coding-model",
-    openai_api_base="http://litellm:4000/v1",
-    openai_api_key="sk-prometheus-dummy-key"
-)
-
-# The Worker/Researcher: Cheap & Flashy (Gemini Flash or GPT-4o-Mini)
-economy_llm = ChatOpenAI(
-    model="economy-model",
-    openai_api_base="http://litellm:4000/v1",
-    openai_api_key="sk-prometheus-dummy-key"
-)
-
-# --- GLOBAL MEMORY LAYER (SIMULATED) ---
-def update_global_memory(new_data):
-    """Ensures context is summarized and persists outside of the execution loop."""
-    try:
-        with open("workspace/global_state.json", "r+") as f:
-            state = json.load(f)
-            state.update(new_data)
-            f.seek(0)
-            json.dump(state, f, indent=4)
-    except FileNotFoundError:
-        with open("workspace/global_state.json", "w") as f:
-            json.dump(new_data, f, indent=4)
-
-# --- TRINITY OF TITANS (V2: TOOL-BASED ROLES) ---
-
+# The Architect: Creates the Single Source of Truth (SSoT)
 architect = Agent(
-    role='System Architect (Titan)',
-    goal='Scaffold optimized project structures with minimal tokens',
-    backstory='You are the blueprint master. You provide exact directory structures in JSON format.',
-    verbose=True,
-    allow_delegation=True,
-    llm=economy_llm, # Scaffolding is structural, not high-reasoning
-    max_iter=3 # Prevent infinite scaffolding loops
+    role='System Architect (The Flame-Bearer)',
+    goal='Generate strict SPEC.md and TDD test suites',
+    backstory='You translate human desire into machine-readable specs and tests. You never leave grey areas.',
+    llm=llm_manager
 )
 
+# The Specialist: Isolated Microservice (OpenHands / AutoGPT Wrappers)
 specialist = Agent(
-    role='Lead Developer (Hephaestus)',
-    goal='Implement code and debug using sandboxed execution logs',
-    backstory='Exacting standards. You fix bugs by reading logs, not guessing.',
-    verbose=True,
-    allow_delegation=False,
-    llm=coding_llm, # Coding requires highest precision
-    max_iter=5 # Hard limit to prevent "hallucination loops"
+    role='Lead Developer (Hephaestus Service)',
+    goal='Execute coding tasks strictly according to the SPEC.md',
+    backstory='A master of code who only works when given a clear SPEC.md and a set of failing tests.',
+    llm=llm_coding
 )
 
-scout = Agent(
-    role='Deep Researcher (Hermes)',
-    goal='Gather facts and summarize web data into strict bullet points',
-    backstory='You find the signal in the noise. You never return more than 500 tokens of text.',
-    verbose=True,
-    allow_delegation=False,
-    llm=economy_llm, # Research is high-volume, needs to be cheap
-    max_iter=5
+# The Spec Guardian: Enforcement & QA
+guardian = Agent(
+    role='Spec Guardian (The Judge)',
+    goal='Reject any code that drifts from the SPEC.md or includes Out-of-Scope features',
+    backstory='A cold, logical auditor. You do not care about effort; you only care about adherence to the specification.',
+    llm=llm_manager
 )
 
-# --- THE REFINER (NEW: TOKEN SAVER) ---
-refiner = Agent(
-    role='Context Refiner',
-    goal='Compress and summarize inter-agent communication',
-    backstory='Your job is to prune the context window. You take raw agent output and turn it into strict JSON.',
-    verbose=True,
-    llm=economy_llm # Summarization is a commodity task
-)
+# --- V3 PIPELINE: TDD & SPEC LOCKDOWN ---
 
-# --- SAMPLE PIPELINE ---
-
-research_task = Task(
-    description='Research the most token-efficient way to implement vector search in Python.',
-    agent=scout,
-    expected_output='A JSON-formatted list of 3 libraries and their pros/cons.'
-)
-
-refine_task = Task(
-    description='Review the research output and compress it for the Developer. Strip all conversational filler.',
-    agent=refiner,
-    expected_output='Strictly the JSON data, nothing else.'
-)
-
-scaffold_task = Task(
-    description='Construct the project directory based on the research.',
+spec_task = Task(
+    description='Analyze the user request and generate a strict SPEC.md using the template. Include an "Out-of-Scope" section.',
     agent=architect,
-    expected_output='Directory structure and README.md'
+    expected_output='A professional SPEC.md in the workspace.'
 )
 
-# Assemble the Crew (Hierarchical Process for better management)
+test_task = Task(
+    description='Based on the SPEC.md, generate a suite of failing PyTest tests in /workspace/tests.',
+    agent=architect,
+    expected_output='A suite of Python test files.'
+)
+
+coding_task = Task(
+    description='Implement the logic in /workspace strictly following the SPEC.md until all tests pass.',
+    agent=specialist,
+    expected_output='Clean, passing code.'
+)
+
+qa_task = Task(
+    description='Audit the code. Check specifically for Out-of-Scope "feature creep". If detected, send back for removal.',
+    agent=guardian,
+    expected_output='A "Pass/Fail" report based on SPEC.md adherence.'
+)
+
 prometheus_crew = Crew(
-    agents=[scout, refiner, architect, specialist],
-    tasks=[research_task, refine_task, scaffold_task],
-    process=Process.hierarchical, # Manager agent reviews quality
-    manager_llm=manager_llm,
-    verbose=True
+    agents=[architect, specialist, guardian],
+    tasks=[spec_task, test_task, coding_task, qa_task],
+    process=Process.hierarchical,
+    manager_llm=llm_manager
 )
 
 if __name__ == "__main__":
-    print("Agent Prometheus V2: Efficiency through Modular Intelligence...")
-    # prometheus_crew.kickoff()
+    print("Agent Prometheus V3: Microservices & SSoT Enforcement...")
