@@ -188,6 +188,35 @@ async def start_hive_task(task_description, timeout=600):
         dashboard_log(f"Task failed: {e}", "ceo")
         return f"Error: {e}"
 
+# --- REDIS TASK POLLER ---
+async def poll_for_tasks():
+    print("🔱 Prometheus Orchestrator is polling for tasks...")
+    while True:
+        # Check for kill switch
+        if r.get("prometheus_kill_switch") == "true":
+            print("🛑 KILL SWITCH DETECTED. Shutting down Orchestrator.")
+            r.delete("prometheus_kill_switch")
+            break
+
+        # Check for new tasks from Telegram or Web
+        task_data = r.rpop("prometheus_tasks")
+        if task_data:
+            payload = json.loads(task_data)
+            task_text = payload.get("task")
+            chat_id = payload.get("chat_id")
+            
+            print(f"📥 New Task Received: {task_text}")
+            result = await start_hive_task(task_text)
+            
+            # Send result back to Telegram
+            response_payload = {
+                "chat_id": chat_id,
+                "text": f"✅ **Forge Complete.**\n\n**Result Summary:**\n{result}"
+            }
+            r.lpush("prometheus_notifications", json.dumps(response_payload))
+            
+        await asyncio.sleep(2)
+
 if __name__ == "__main__":
-    print("Agent Prometheus V5.2: Production Hardened. Security & Stability Active.")
-    asyncio.run(start_hive_task())
+    print("Agent Prometheus V5.5: Production Hardened. Core Logic Active.")
+    asyncio.run(poll_for_tasks())

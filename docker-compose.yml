@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Central API Gateway
+  # 1. Central API Gateway (The Switchboard)
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     volumes:
@@ -14,20 +14,44 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - REDIS_URL=redis://redis:6379
     networks:
-      - prometheus-public
-      - prometheus-internal
+      - prometheus-net
 
-  # 2. Redis Nervous System
+  # 2. Redis Nervous System (For Caching & Queues)
   redis:
     image: redis:alpine
     networks:
-      - prometheus-internal
+      - prometheus-net
 
-  # 3. The CEO / Orchestrator (Securely Isolated)
-  prometheus-manager:
+  # 3. ChromaDB (The Hive Mind Experience Ledger)
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes:
+      - ./workspace/hive_mind_db:/chroma/chroma
+    ports:
+      - "8001:8000"
+    networks:
+      - prometheus-net
+
+  # 4. OpenHands (The Coding Specialist & Sandbox)
+  openhands:
+    image: docker.all-hands.dev/all-hands-ai/openhands:main
+    environment:
+      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:main
+      - LLM_BASE_URL=http://litellm:4000
+      - LLM_API_KEY=sk-prometheus-dummy
+      - WORKSPACE_MOUNT_PATH=${PWD}/workspace
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./workspace:/workspace
+    networks:
+      - prometheus-net
+
+  # 5. The Orchestrator (The Brain)
+  prometheus-orchestrator:
     build: 
       context: ./
       dockerfile: docker/Manager.Dockerfile
+    command: ["python", "prometheus_manager.py"]
     volumes:
       - ./workspace:/app/workspace
       - ./prometheus_manager.py:/app/prometheus_manager.py
@@ -35,15 +59,36 @@ services:
       - ./.prometheusignore:/app/.prometheusignore
     environment:
       - OPENAI_API_BASE=http://litellm:4000/v1
-      - OPENAI_API_KEY=sk-prometheus-dummy-internal-key
+      - OPENAI_API_KEY=sk-prometheus-dummy
       - REDIS_HOST=redis
+      - CHROMA_HOST=chromadb
     depends_on:
       - litellm
       - redis
+      - chromadb
     networks:
-      - prometheus-internal
+      - prometheus-net
 
-  # 4. Web Dashboard (Frontend)
+  # 6. The Front Desk (Telegram Gateway)
+  prometheus-frontdesk:
+    build: 
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["python", "telegram_gateway.py"]
+    volumes:
+      - ./workspace:/app/workspace
+      - ./telegram_gateway.py:/app/telegram_gateway.py
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - REDIS_HOST=redis
+      - VPS_PUBLIC_IP=${VPS_PUBLIC_IP}
+    depends_on:
+      - redis
+    networks:
+      - prometheus-net
+
+  # 7. Web Dashboard (Frontend)
   dashboard:
     image: node:18-alpine
     working_dir: /app
@@ -53,9 +98,9 @@ services:
       - "5173:5173"
     command: ["npm", "run", "dev", "--", "--host"]
     networks:
-      - prometheus-public
+      - prometheus-net
 
-  # 5. Dashboard Backend
+  # 8. Dashboard Backend
   backend:
     build:
       context: ./
@@ -63,6 +108,7 @@ services:
     volumes:
       - ./backend:/app
       - ./workspace:/app/workspace
+      - ./vision_node.py:/app/vision_node.py
     ports:
       - "8000:8000"
     environment:
@@ -70,30 +116,22 @@ services:
     depends_on:
       - redis
     networks:
-      - prometheus-public
-      - prometheus-internal
+      - prometheus-net
 
-  # 6. Remote Vision & Hands Bridge (The Receiver)
+  # 9. Remote Vision & Hands Bridge
   vision-bridge:
     build:
       context: ./
       dockerfile: docker/Manager.Dockerfile
     volumes:
       - ./vps_receiver.py:/app/vps_receiver.py
-    command: ["python", "vps_receiver.py"]
+      - ./workspace:/app/workspace
     ports:
       - "8765:8765"
-    environment:
-      - REDIS_HOST=redis
-    depends_on:
-      - redis
+    command: ["python", "vps_receiver.py"]
     networks:
-      - prometheus-public
-      - prometheus-internal
+      - prometheus-net
 
 networks:
-  prometheus-internal:
+  prometheus-net:
     driver: bridge
-    internal: true # EXTREME SECURITY: Block manager from all internet access.
-  prometheus-public:
-    driver: bridge # Standard bridge for UI and API connectivity.

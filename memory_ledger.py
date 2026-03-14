@@ -5,11 +5,19 @@ import os
 
 class ExperienceLedger:
     def __init__(self, db_path="./workspace/hive_mind_db"):
-        """Initializes the local, persistent memory node."""
-        # Ensure the path exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        # ChromaDB runs entirely locally, saving data to the given folder
-        self.client = chromadb.PersistentClient(path=db_path)
+        """Initializes the persistent memory node."""
+        chroma_host = os.getenv("CHROMA_HOST")
+        
+        if chroma_host:
+            # Connect to the remote ChromaDB container (Titan Class)
+            self.client = chromadb.HttpClient(host=chroma_host, port=8000)
+            print(f"🧠 Hive Mind connected to remote ChromaDB at {chroma_host}")
+        else:
+            # Fallback to local persistent storage
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            self.client = chromadb.PersistentClient(path=db_path)
+            print(f"🧠 Hive Mind initialized with local storage at {db_path}")
+
         self.collection = self.client.get_or_create_collection(name="agent_lessons")
 
     def record_lesson(self, task_context: str, what_failed: str, the_fix: str) -> str:
