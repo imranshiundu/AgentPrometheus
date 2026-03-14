@@ -1,5 +1,7 @@
 # Agent Prometheus: The Titan-Class AI Orchestrator
 
+![Agent Prometheus Logo](logo.png)
+
 Agent Prometheus is a hierarchical Multi-Agent System (MAS) that unifies **AutoGPT, OpenHands, crewAI, and gpt-engineer** into a single, cohesive entity. It brings the "fire" of autonomous research and specialized coding to your local environment through a central cognitive core.
 
 ## 🛠 Prerequisites
