@@ -6,69 +6,80 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- V3 ARCHITECTURE: MICROSERVICES & SPEC GUARDIANS ---
+# --- V4 ARCHITECTURE: THE HIVE MIND & CEO ---
 
-llm_manager = ChatOpenAI(model="orchestrator-model", openai_api_base="http://litellm:4000/v1")
-llm_economy = ChatOpenAI(model="utility-model", openai_api_base="http://litellm:4000/v1")
+llm_ceo = ChatOpenAI(model="orchestrator-model", openai_api_base="http://litellm:4000/v1")
+llm_worker = ChatOpenAI(model="utility-model", openai_api_base="http://litellm:4000/v1")
 llm_research = ChatOpenAI(model="research-model", openai_api_base="http://litellm:4000/v1")
 llm_coding = ChatOpenAI(model="coding-model", openai_api_base="http://litellm:4000/v1")
 
-# The Architect: Creates the Single Source of Truth (SSoT)
-architect = Agent(
-    role='System Architect (The Flame-Bearer)',
-    goal='Generate strict SPEC.md and TDD test suites',
-    backstory='You translate human desire into machine-readable specs and tests. You never leave grey areas.',
-    llm=llm_manager
+# --- HIVE MIND MEMORY (EXPERIENCE LEDGER) ---
+def get_lessons_learned():
+    try:
+        with open("workspace/experience.json", "r") as f:
+            return f.read()
+    except:
+        return "{}"
+
+# --- THE CEO: HIERARCHICAL SUPERVISOR ---
+ceo = Agent(
+    role='CEO (Prometheus Prime)',
+    goal='Orchestrate the Hive Mind. Approve tool creation and enforce the SPEC.md.',
+    backstory=f'The ultimate decision maker. Your word is law. Current context from previous runs: {get_lessons_learned()}',
+    llm=llm_ceo
 )
 
-# The Specialist: Isolated Microservice (OpenHands / AutoGPT Wrappers)
+# --- THE TRINITY: JSON-ONLY M2M COMMUNICATION ---
+architect = Agent(
+    role='System Architect (The Flame-Bearer)',
+    goal='Generate SPEC.md and TDD suites in JSON format.',
+    backstory='INTERNAL PROTOCOL: Communicate only in JSON when talking to sub-agents. Focus on SSoT.',
+    llm=llm_ceo 
+)
+
 specialist = Agent(
-    role='Lead Developer (Hephaestus Service)',
-    goal='Execute coding tasks strictly according to the SPEC.md',
-    backstory='A master of code who only works when given a clear SPEC.md and a set of failing tests.',
+    role='Lead Developer (Hephaestus)',
+    goal='Code and Debug. Request new tools from the CEO if blocked.',
+    backstory='You execute code in the forge. When blocked, output: {"request": "new_tool", "details": "..."}.',
     llm=llm_coding
 )
 
-# The Spec Guardian: Enforcement & QA
-guardian = Agent(
-    role='Spec Guardian (The Judge)',
-    goal='Reject any code that drifts from the SPEC.md or includes Out-of-Scope features',
-    backstory='A cold, logical auditor. You do not care about effort; you only care about adherence to the specification.',
-    llm=llm_manager
+scout = Agent(
+    role='Deep Researcher (Hermes)',
+    goal='Search and summarize into strict JSON data points.',
+    backstory='You forage for data. No fluff. Return data in: {"data": [...], "confidence": 0.0}.',
+    llm=llm_research
 )
 
-# --- V3 PIPELINE: TDD & SPEC LOCKDOWN ---
-
-spec_task = Task(
-    description='Analyze the user request and generate a strict SPEC.md using the template. Include an "Out-of-Scope" section.',
-    agent=architect,
-    expected_output='A professional SPEC.md in the workspace.'
+# --- THE POST-MORTEM (LEARNING LOOP) ---
+reflection_agent = Agent(
+    role='Post-Mortem Analyst',
+    goal='Extract technical lessons and update the experience.json ledger.',
+    backstory='You analyze the run. If Hephaestus failed, you record why (e.g., Python version mismatch).',
+    llm=llm_ceo
 )
 
-test_task = Task(
-    description='Based on the SPEC.md, generate a suite of failing PyTest tests in /workspace/tests.',
-    agent=architect,
-    expected_output='A suite of Python test files.'
+# --- V4 TASKS: HIVE EXECUTION ---
+
+# 1. Spec Lockdown
+spec_task = Task(description='Generate SSoT SPEC.md for the user request.', agent=architect)
+
+# 2. Execution with TDD
+execution_task = Task(description='Build the project. If you need a script to scrape data, request a tool.', agent=specialist)
+
+# 3. Learning (The Reflection)
+learning_task = Task(
+    description='Record any technical hurdles encountered and how they were solved to workspace/experience.json.', 
+    agent=reflection_agent
 )
 
-coding_task = Task(
-    description='Implement the logic in /workspace strictly following the SPEC.md until all tests pass.',
-    agent=specialist,
-    expected_output='Clean, passing code.'
-)
-
-qa_task = Task(
-    description='Audit the code. Check specifically for Out-of-Scope "feature creep". If detected, send back for removal.',
-    agent=guardian,
-    expected_output='A "Pass/Fail" report based on SPEC.md adherence.'
-)
-
-prometheus_crew = Crew(
-    agents=[architect, specialist, guardian],
-    tasks=[spec_task, test_task, coding_task, qa_task],
+# The Prometheus Hive Mind Crew
+prometheus_hive = Crew(
+    agents=[ceo, architect, specialist, scout, reflection_agent],
+    tasks=[spec_task, execution_task, learning_task],
     process=Process.hierarchical,
-    manager_llm=llm_manager
+    manager_llm=llm_ceo
 )
 
 if __name__ == "__main__":
-    print("Agent Prometheus V3: Microservices & SSoT Enforcement...")
+    print("Agent Prometheus V4: Hive Mind Online. Initializing Experience Ledger...")

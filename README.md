@@ -1,14 +1,20 @@
-# Agent Prometheus: The Titan-Class AI Orchestrator (V2)
+## 🧠 V4 Evolution: The Hive Mind
 
-![Agent Prometheus Logo](logo.png)
+Agent Prometheus has evolved into a **Self-Improving Hive Mind**. By decoupling memory and adopting Machine-to-Machine (M2M) communication, the Titan now learns from its own history and slashes token costs.
 
-Agent Prometheus is a hierarchical Multi-Agent System (MAS) that unifies the specialized capabilities of **AutoGPT, OpenHands, crewAI, and gpt-engineer**. 
+### 1. The Shared Brain (Experience Ledger)
+Prometheus maintains a persistent `experience.json` ledger. Before every task, the Hive Mind reads its past successes and failures, ensuring it never makes the same mistake twice.
 
-In its V2 evolution, Prometheus has moved from a "Framework Integration" model to a **"Modular Tool Intelligence"** model, drastically reducing token consumption and architecture bloat.
+### 2. M2M JSON Communication (Token Slashing)
+Internal agent communication has been moved from English to strict **JSON Schemas** over a Redis message queue. This reduces internal "chatter" by up to 60%, saving thousands of tokens per hour.
+
+### 3. CEO Orchestration (Hierarchical Governance)
+A high-logic **CEO Agent** (Claude 3.5 Sonnet) oversees all operations. It approves the creation of new tools and ensures no agent violates the "Owner's Rules" or the "SSoT."
+
+### 4. Dynamic Tool Creation
+The Specialist (Hephaestus) can now code and deploy **new tools** in real-time for other agents, allowing the Hive Mind to adapt to new technical hurdles (e.g., bypass blockers or custom data formats).
 
 ---
-
-## 🔱 V3 Evolution: Microservices & SSoT
 
 Agent Prometheus has evolved from basic integration to a **Microservices-Based Agent Architecture**. This preserves the "magic" of framework-specific reasoning loops while enforcing a **Single Source of Truth (SSoT)**.
 

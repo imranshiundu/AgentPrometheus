@@ -10,7 +10,14 @@ services:
       - "4000:4000"
     environment:
       - OPENAI_API_KEY=${REAL_API_KEY}
+      - REDIS_URL=redis://redis:6379
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
+
+  # Hive Mind Memory & Queue
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
 
   # Multi-Agent Manager
   prometheus-manager:
