@@ -55,6 +55,17 @@ docker-compose up -d
 ```
 *Note: V2 enables **Prompt Caching** by default via LiteLLM to reduce costs for repetitive system prompts.*
 
+### 3. The "Switchboard" Hijack
+Prometheus "hijacks" the connection of sub-frameworks to ensure they use the correct cost-optimized model:
+```bash
+# Force specialized agents to talk to the local switchboard
+OPENHANDS_OPENAI_API_BASE=http://localhost:4000
+OPENHANDS_OPENAI_MODEL_NAME=coding-model
+
+AUTOGPT_OPENAI_API_BASE=http://localhost:4000
+AUTOGPT_OPENAI_MODEL_NAME=research-model
+```
+
 ---
 
 ## 📖 Operational Documentation

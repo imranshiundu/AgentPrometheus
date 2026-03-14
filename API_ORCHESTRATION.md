@@ -1,47 +1,44 @@
-# Agent Prometheus: API Orchestration & Key Management
+# Prometheus: The Tiered Switchboard (API Orchestration)
 
-As a Senior Developer, ensuring cost-efficiency and security while managing four massive AI frameworks is paramount. This document defines how we unify these frameworks under a single API key identity.
+To prevent the "Frankenstein" stack from burning through your budget, Agent Prometheus uses a **Tiered Switchboard** architecture via the LiteLLM Gateway.
 
-## 1. The Single Identity Principle
-Each framework (AutoGPT, OpenHands, crewAI, gpt-engineer) was originally designed to consume its own `OPENAI_API_KEY`. To simplify this and allow for centralized monitoring, we use **LiteLLM Proxy** as our Unified Gateway.
+## 1. The Switchboard (config.yaml)
+LiteLLM intercepts every agent request and routes it to the most cost-effective model based on the agent's specific role.
 
-## 2. Infrastructure Setup
+### Model Tiers:
+| Role | Alias | Recommended Model | Use Case |
+| :--- | :--- | :--- | :--- |
+| **Orchestrator** | `orchestrator-model` | Claude 3.5 Sonnet | Logic, QA, Delegation |
+| **Specialist** | `coding-model` | Claude 3.5 Sonnet | Hard coding & debugging |
+| **Scout** | `research-model` | Gemini 1.5 Flash | High-volume web research |
+| **Utility** | `utility-model` | GPT-4o-Mini | Scaffolding, Summarizing |
 
-### Gateway Architecture
-Instead of providing the actual API key to each container/process, we provide a local mock endpoint:
+## 2. Token Saving Architecture (V3)
 
-1.  **Orchestrator Level:** A single master `.env` file contains the `REAL_API_KEY`.
-2.  **Proxy Level:** LiteLLM starts as a service, consuming the `REAL_API_KEY`. It exposes a local endpoint: `http://localhost:4000/v1`.
-3.  **Client Level:** All frameworks are configured with:
-    - `OPENAI_API_BASE=http://localhost:4000/v1`
-    - `OPENAI_API_KEY=sk-hybrid-orchestrator-key` (a dummy key)
+### **A. Global Prompt Caching (The 90% Discount)**
+Agents repeatedly send massive system prompts (10k+ tokens) on every loop. By enabling Redis-based caching in the LiteLLM gateway, we stop paying for these redundant tokens.
+- **Enabled in:** `config/litellm_config.yaml`
+- **Requirement:** A running Redis instance.
 
-## 3. Configuration Breakdown
-
-### LiteLLM Mapping (`config.yaml`)
+### **B. The $5.00 Kill-Switch**
+To prevent AutoGPT or other agents from entering a "Reasoning Death Spiral," the gateway enforces a hard budget cap:
 ```yaml
-model_list:
-  - model_name: gpt-4
-    litellm_params:
-      model: openai/gpt-4
-      api_key: "os.environ/REAL_API_KEY"
-  - model_name: gpt-3.5-turbo
-    litellm_params:
-      model: openai/gpt-3.5-turbo
-      api_key: "os.environ/REAL_API_KEY"
+litellm_settings:
+  max_budget: 5.00 # Kill session if cost exceeds $5
 ```
 
-### Framework-Specific Injection
-- **crewAI:** Uses `LLM(model="gpt-4", base_url="http://localhost:4000/v1")`.
-- **OpenHands:** Injected via `config.toml` under `[llm]` section.
-- **AutoGPT:** Configured in `.env` under `OPENAI_API_BASE`.
-- **gpt-engineer:** Passed via environment variable `OPENAI_API_BASE`.
+### **C. Standardized Logging**
+We use `success_callback: ["langfuse"]` to monitor exactly which agent is consuming the most resources, allowing us to swap their backend model if they become too expensive.
 
-## 4. Key Benefits
-1. **Budget Capping:** We can set a hard limit at the LiteLLM level. If the "AutoGPT" loop goes rogue and spends $10, the proxy shuts down the connection for all agents.
-2. **Unified Observability:** Every single token spent by any framework is logged in one place. We can see exactly which "agent" (Research vs Coding) is consuming the most resources.
-3. **Model Agnosticism:** This is the core strength of Agent Prometheus. The LiteLLM Gateway allows you to swap the entire "Brain" (e.g., from OpenAI to **Anthropic Claude**, **Google Gemini**, or **Local Llama 3**) without changing a single line of code in the four underlying frameworks.
+## 3. Implementation (The "Hijack")
+We don't rewrite the sub-frameworks. We simply "hijack" their connection via environment variables in the central `.env`:
 
-## 5. Security Guardrails
-- **Key Rotation:** One-click rotation at the proxy level.
-- **Access Control:** Only the internal Docker network can reach the LiteLLM Proxy. No external traffic can spoof requests using the proxy.
+```bash
+# Force OpenHands to talk to the local switchboard
+OPENHANDS_OPENAI_API_BASE=http://localhost:4000
+OPENHANDS_OPENAI_MODEL_NAME=coding-model
+
+# Force AutoGPT to use the economy model
+AUTOGPT_OPENAI_API_BASE=http://localhost:4000
+AUTOGPT_OPENAI_MODEL_NAME=research-model
+```

@@ -8,8 +8,9 @@ load_dotenv()
 
 # --- V3 ARCHITECTURE: MICROSERVICES & SPEC GUARDIANS ---
 
-llm_manager = ChatOpenAI(model="manager-model", openai_api_base="http://litellm:4000/v1")
-llm_economy = ChatOpenAI(model="economy-model", openai_api_base="http://litellm:4000/v1")
+llm_manager = ChatOpenAI(model="orchestrator-model", openai_api_base="http://litellm:4000/v1")
+llm_economy = ChatOpenAI(model="utility-model", openai_api_base="http://litellm:4000/v1")
+llm_research = ChatOpenAI(model="research-model", openai_api_base="http://litellm:4000/v1")
 llm_coding = ChatOpenAI(model="coding-model", openai_api_base="http://litellm:4000/v1")
 
 # The Architect: Creates the Single Source of Truth (SSoT)

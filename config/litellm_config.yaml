@@ -1,34 +1,50 @@
 model_list:
-  # Tier 1: High Reasoning (Orchestration & Critical Coding)
-  - model_name: high-reasoning-model
+  # 1. THE ORCHESTRATOR & QA GUARDIAN (High Reasoning)
+  # Needs deep logic to manage agents and verify specs.
+  - model_name: orchestrator-model
     litellm_params:
-      model: anthropic/claude-3-5-sonnet-20240620
-      api_key: "os.environ/ANTHROPIC_API_KEY"
-      extra_headers:
-        anthropic-beta: "prompt-caching-2024-05-22"
+      model: anthropic/claude-3-5-sonnet-latest 
+      api_key: os.environ/ANTHROPIC_API_KEY
+      max_tokens: 4096
 
-  - model_name: manager-model
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: "os.environ/REAL_API_KEY"
-
-  # Tier 2: Specialized Execution (Reliable Coding)
+  # 2. THE SPECIALIST / OPENHANDS (Coding Champion)
+  # Claude 3.5 Sonnet is currently the best at strict coding tasks.
   - model_name: coding-model
     litellm_params:
-      model: anthropic/claude-3-5-sonnet-20240620
-      api_key: "os.environ/ANTHROPIC_API_KEY"
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+      max_tokens: 8192
 
-  # Tier 3: Speed & Economy (Research, Scaffolding, Summarization)
-  - model_name: economy-model
+  # 3. THE SCOUT / AUTOGPT (High Volume, Fast)
+  # Web scraping and summarization don't need expensive models.
+  - model_name: research-model
     litellm_params:
-      model: google/gemini-1.5-flash
-      api_key: "os.environ/GEMINI_API_KEY"
+      model: gemini/gemini-2.0-flash # Adjusted to 2.0 based on availability
+      api_key: os.environ/GEMINI_API_KEY
+      max_tokens: 8192
 
-  - model_name: scaffolding-model
+  # 4. THE ARCHITECT & SUMMARIZER (Cheap Logic)
+  # For scaffolding folders or compressing context between handoffs.
+  - model_name: utility-model
     litellm_params:
       model: openai/gpt-4o-mini
-      api_key: "os.environ/REAL_API_KEY"
+      api_key: os.environ/OPENAI_API_KEY
+      max_tokens: 4096
 
-router_settings:
-  routing_strategy: simple-shuffle # Can be usage-based for more complex setups
-  enable_prompt_caching: true
+# --- TOKEN SAVING ARCHITECTURE ---
+litellm_settings:
+  # 1. Enable Caching (The 90% Discount)
+  # This stops agents from paying to re-read their 10k token system prompts on every loop.
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: 6379
+
+  # 2. Prevent Infinite Loops
+  # Hard cap on the maximum budget any single framework can burn in a session.
+  max_budget: 5.00 # Drops the connection if cost exceeds $5.00
+
+  # 3. Standardize Output Logging
+  # Crucial for tracking exactly which agent is burning the most tokens.
+  success_callback: ["langfuse"] 

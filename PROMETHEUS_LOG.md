@@ -22,4 +22,6 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] **Architecture V3 Overhaul:** Shifted to a **Microservices-Based Agent Architecture**.
 - [Action] Established the **Single Source of Truth (SSoT)** protocol via the AI-Optimized `SPEC_TEMPLATE.md`.
 - [Action] Integrated the "Anti-Hallucination Directive" logic into the Spec Guardian's review criteria.
+- [Action] Implemented the **Tiered Switchboard (LiteLLM)** with Redis-based Prompt Caching ($5 budget cap).
+- [Action] Refactored `prometheus_manager.py` to use role-based model aliases (`orchestrator`, `coding`, `research`).
 - [Next Step] Final system verification with the new microservices service handlers.
