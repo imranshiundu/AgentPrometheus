@@ -1,5 +1,13 @@
 import asyncio
+import os
+import json
+import time
 import fnmatch
+from datetime import datetime
+import redis
+from crewai import Agent, Task, Crew, Process
+from langchain_openai import ChatOpenAI
+from memory_ledger import ExperienceLedger
 
 # --- DIRECTORY LOCKDOWN ---
 # Structure the workspace to prevent "Specialist" from running unvetted "Scout" files directly.
@@ -61,15 +69,24 @@ triage_agent = Agent(
 # Initialize the shared brain
 hive_mind_db = ExperienceLedger()
 
+# --- TOOLS: HIVE MIND ACCESS ---
+def get_advice_tool(task: str):
+    """Consults the Experience Ledger for past similar tasks."""
+    return hive_mind_db.get_advice(task)
+
+def record_lesson_tool(task_context: str, what_failed: str, the_fix: str):
+    """Records a successful fix to the Experience Ledger."""
+    return hive_mind_db.record_lesson(task_context, what_failed, the_fix)
+
 # --- V5.4 VISION & REMOTE HANDS (Remote Control) ---
-def remote_see(pin):
+def remote_see_tool(pin):
     """Retrieves the latest screenshot from a paired Vision Node."""
     screenshot_b64 = r.get(f"prometheus_eyes:{pin}")
     if not screenshot_b64:
         return "ERROR: No paired Vision Node found or stream is inactive."
-    return screenshot_b64 # The agent/CEO can now 'see' this image
+    return screenshot_b64
 
-def remote_action(pin, action, **kwargs):
+def remote_action_tool(pin, action, **kwargs):
     """Sends a mouse or keyboard command to the paired Vision Node."""
     payload = {"pin": pin, "action": action, **kwargs}
     r.lpush(f"prometheus_hands:{pin}", json.dumps(payload))
@@ -77,48 +94,10 @@ def remote_action(pin, action, **kwargs):
 
 # --- THE HIVE MIND CORE RULES ---
 HIVE_MIND_CORE_RULES = """
-* RULE 1 (Pre-Flight Check): Before executing any multi-step coding task or complex terminal command, you MUST use the `get_advice` tool with a description of your task. 
-* RULE 2 (Post-Mortem): If you attempt a solution that results in an error, and you eventually find a working fix, you MUST use the `record_lesson` tool. Detail exactly what failed and the specific code/command that fixed it.
-* RULE 3 (Vision & Remote Control): You have the physical ability to control the user's local computer. If a task requires GUI interaction (opening browsers locally, clicking apps, trading on websites), ask the user to pair their 'Vision Node'. Provide them the command: `Use /connect in Telegram to begin pairing.` Once paired, you can 'see' via `remote_see()` and 'act' via `remote_action()`.
+* RULE 1: Before execution, you MUST use `get_advice_tool`.
+* RULE 2: After a fix, you MUST use `record_lesson_tool`.
+* RULE 3: For GUI tasks, use `remote_see_tool` and `remote_action_tool`.
 """
-
-# --- THE CEO: HIERARCHICAL SUPERVISOR ---
-ceo = Agent(
-    role='CEO (Prometheus Prime)',
-    goal='Orchestrate the Hive Mind. Approve tool creation and enforce the SPEC.md.',
-    backstory=f'The ultimate decision maker. Your word is law. Your strategy is informed by the cumulative experience of the Hive Mind. {HIVE_MIND_CORE_RULES}',
-    llm=llm_ceo
-)
-
-# --- THE TRINITY: JSON-ONLY M2M COMMUNICATION ---
-architect = Agent(
-    role='System Architect (The Flame-Bearer)',
-    goal='Generate SPEC.md and TDD suites in JSON format.',
-    backstory=f'INTERNAL PROTOCOL: Communicate only in JSON when talking to sub-agents. Focus on SSoT. {HIVE_MIND_CORE_RULES}',
-    llm=llm_ceo 
-)
-
-specialist = Agent(
-    role='Lead Developer (Hephaestus)',
-    goal='Code and Debug. Request new tools from the CEO if blocked.',
-    backstory=f'You execute code in the forge. When blocked, output: {{"request": "new_tool", "details": "..."}}. {HIVE_MIND_CORE_RULES}',
-    llm=llm_coding
-)
-
-scout = Agent(
-    role='Deep Researcher (Hermes)',
-    goal='Search and summarize into strict JSON data points.',
-    backstory=f'You forage for data. No fluff. Return data in: {{"data": [...], "confidence": 0.0}}. {HIVE_MIND_CORE_RULES}',
-    llm=llm_research
-)
-
-# --- THE POST-MORTEM (LEARNING LOOP) ---
-reflection_agent = Agent(
-    role='Post-Mortem Analyst',
-    goal='Extract technical lessons and update the Hive Mind database.',
-    backstory='You analyze the run. You translate technical hurdles into JSON lessons for the vector database.',
-    llm=llm_ceo
-)
 
 # --- TELEGRAM HITL COMMUNICATION ---
 def notify_boss(text, approval_gate=False, file_path=None):
@@ -145,6 +124,8 @@ def notify_boss(text, approval_gate=False, file_path=None):
                 return "User approved the request."
             elif approval == "rejected":
                 raise Exception("User rejected the request. Aborting task.")
+            
+            time.sleep(2) # CRITICAL: Prevents CPU from exploding while waiting
 
 def check_kill_switch():
     """Non-blocking check for the /stop command."""
@@ -152,20 +133,69 @@ def check_kill_switch():
         r.set("prometheus_kill_switch", "false")
         raise Exception("CRITICAL: Manual /stop command received via Telegram. Terminating session.")
 
-# --- V4.1 TASKS: HIVE EXECUTION ---
+# --- AGENTS ---
+ceo = Agent(
+    role='CEO (Prometheus Prime)',
+    goal='Orchestrate the Hive Mind. Enforce the SPEC.md.',
+    backstory=f'The ultimate decision maker. {HIVE_MIND_CORE_RULES}',
+    tools=[notify_boss, get_advice_tool, record_lesson_tool],
+    llm=llm_ceo
+)
 
-def spec_step(task_description):
-    # 1. Spec Generation
-    # ... (agent logic here)
-    spec_content = "V4.1 SPEC CONTENT" # Placeholder
-    notify_boss(f"📋 *SPEC.md Generated*:\n{spec_content}\n\nPlease approve to start coding.", approval_gate=True)
-    return "Spec approved by boss."
+architect = Agent(
+    role='System Architect',
+    goal='Generate SPEC.md and TDD suites.',
+    backstory=f'Focus on SSoT and technical spec. {HIVE_MIND_CORE_RULES}',
+    tools=[get_advice_tool],
+    llm=llm_ceo
+)
+
+specialist = Agent(
+    role='Lead Developer (Hephaestus)',
+    goal='Code and Debug.',
+    backstory=f'You execute code in the forge. {HIVE_MIND_CORE_RULES}',
+    tools=[get_advice_tool, record_lesson_tool, remote_see_tool, remote_action_tool],
+    llm=llm_coding
+)
+
+scout = Agent(
+    role='Deep Researcher (Hermes)',
+    goal='Search and summarize.',
+    backstory=f'Forage for web data. {HIVE_MIND_CORE_RULES}',
+    tools=[get_advice_tool],
+    llm=llm_research
+)
+
+# --- TASKS ---
+research_task = Task(
+    description='Search for requirements and best practices for the task: {task}',
+    agent=scout,
+    expected_output='A JSON summary of research findings.'
+)
 
 spec_task = Task(
-    description='Generate SSoT SPEC.md. Once done, use notify_boss to get Telegram approval.', 
-    agent=architect
+    description='Based on research, draft a SPEC.md for the task: {task}. Use notify_boss to get approval.',
+    agent=architect,
+    context=[research_task],
+    expected_output='A technical specification approved by the user.'
 )
-# ... rest of the tasks
+
+coding_task = Task(
+    description='Implement the code based on the approved SPEC.md for: {task}',
+    agent=specialist,
+    context=[spec_task],
+    expected_output='A fully functional and tested codebase in the workspace.'
+)
+
+# --- THE HIVE MIND CREW ---
+prometheus_hive = Crew(
+    agents=[ceo, architect, specialist, scout],
+    tasks=[research_task, spec_task, coding_task],
+    process=Process.hierarchical,
+    manager_agent=ceo,
+    verbose=True
+)
+
 
 # --- EXECUTION WITH TIMEOUTS (Prevent Hanging) ---
 async def start_hive_task(task_description, timeout=600):
@@ -174,7 +204,7 @@ async def start_hive_task(task_description, timeout=600):
         dashboard_log("Initializing Architect for Spec drafting...", "architect")
         # Actual Crew Execution
         result = await asyncio.wait_for(
-            prometheus_hive.kickoff(inputs={'task': task_description}), 
+            asyncio.to_thread(prometheus_hive.kickoff, inputs={'task': task_description}), 
             timeout=timeout
         )
         dashboard_log("Task completed successfully.", "ceo")

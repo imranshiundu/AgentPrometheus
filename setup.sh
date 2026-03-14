@@ -25,6 +25,7 @@ TELEGRAM_CHAT_ID=...
 
 # --- INFRASTRUCTURE ---
 REDIS_HOST=localhost
+VPS_PUBLIC_IP=123.45.67.89
 EOF
     echo "⚠️  Please update the .env file with your actual API keys and Telegram credentials."
 fi
