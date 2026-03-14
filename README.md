@@ -1,21 +1,18 @@
-## 🧠 V4 Evolution: The Hive Mind
+## 📱 V5 Evolution: Remote Command (Telegram)
 
-Agent Prometheus has evolved into a **Self-Improving Hive Mind**. By decoupling memory and adopting Machine-to-Machine (M2M) communication, the Titan now learns from its own history and slashes token costs.
+Agent Prometheus is now a **Remote Workforce**. You can command the Hive Mind and approve specifications directly from your phone via the **Telegram Gateway**.
 
-### 1. The Shared Brain (Vector Memory Node)
-Prometheus maintains a persistent **ChromaDB Vector Database** in the shared workspace. 
-- **Pre-Flight Check:** Agents query the database before starting a task to get advice from past similar tasks.
-- **Post-Mortem Learning:** Technical hurdles and successful fixes are embedded and stored for future recall.
-- **Infinite Recall:** Unlike context windows, this memory never fills up and uses minimal tokens.
+### 1. The "Front Desk" Protocol
+You no longer need to watch the terminal. Send a task on Telegram, and the Gateway handles the asynchronous execution. The agents will text you when they reach a milestone or need a decision.
 
-### 2. M2M JSON Communication (Token Slashing)
-Internal agent communication has been moved from English to strict **JSON Schemas** over a Redis message queue. This reduces internal "chatter" by up to 60%, saving thousands of tokens per hour.
+### 2. Interactive Approval Gates
+Prometheus uses **Inline Telegram Buttons** for security and token efficiency. 
+- After drafting a `SPEC.md`, the AI pauses.
+- You receive an **Approve ✅** or **Reject ❌** button.
+- The forge only begins when you give the green light.
 
-### 3. CEO Orchestration (Hierarchical Governance)
-A high-logic **CEO Agent** (Claude 3.5 Sonnet) oversees all operations. It approves the creation of new tools and ensures no agent violates the "Owner's Rules" or the "SSoT."
-
-### 4. Dynamic Tool Creation
-The Specialist (Hephaestus) can now code and deploy **new tools** in real-time for other agents, allowing the Hive Mind to adapt to new technical hurdles (e.g., bypass blockers or custom data formats).
+### 3. Absolute Security
+The system is hard-locked to your personal Telegram `chat_id`. It will ignore all other users, ensuring your local machine remains a private fortress.
 
 ---
 

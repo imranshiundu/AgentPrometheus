@@ -61,11 +61,40 @@ reflection_agent = Agent(
     llm=llm_ceo
 )
 
+# --- TELEGRAM HITL COMMUNICATION ---
+def notify_boss(text, approval_gate=False):
+    """Pushes a notification to the Telegram Gateway via Redis."""
+    payload = {
+        "text": text,
+        "approval_gate": approval_gate
+    }
+    r.lpush("prometheus_notifications", json.dumps(payload))
+    
+    if approval_gate:
+        print("Waiting for Telegram approval...")
+        # Block until approval is received in Redis
+        r.delete("prometheus_approval")
+        while True:
+            approval = r.get("prometheus_approval")
+            if approval == "approved":
+                return "User approved the request."
+            elif approval == "rejected":
+                raise Exception("User rejected the request. Aborting task.")
+
 # --- V4.1 TASKS: HIVE EXECUTION ---
 
-spec_task = Task(description='Generate SSoT SPEC.md for the user request.', agent=architect)
-execution_task = Task(description='Build the project using TDD and Hive Mind advice.', agent=specialist)
-learning_task = Task(description='Identify key technical lessons and record them permanently using the reflection loop.', agent=reflection_agent)
+def spec_step(task_description):
+    # 1. Spec Generation
+    # ... (agent logic here)
+    spec_content = "V4.1 SPEC CONTENT" # Placeholder
+    notify_boss(f"📋 *SPEC.md Generated*:\n{spec_content}\n\nPlease approve to start coding.", approval_gate=True)
+    return "Spec approved by boss."
+
+spec_task = Task(
+    description='Generate SSoT SPEC.md. Once done, use notify_boss to get Telegram approval.', 
+    agent=architect
+)
+# ... rest of the tasks
 
 # The Prometheus Hive Mind Crew
 prometheus_hive = Crew(

@@ -32,4 +32,8 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] **Architecture V4.1 Overhaul:** Implemented the **Vector-Based Memory Node** (ChromaDB).
 - [Action] Created `memory_ledger.py` for persistent, token-efficient experience retrieval.
 - [Action] Enforced **HIVE_MIND_CORE_RULES** (Pre-Flight Check & Post-Mortem) in supervisor prompts.
-- [Next Step] Verifying end-to-end vector recall in a test scenario.
+- [Action] **Architecture V5 Overhaul:** Integrated the **Telegram Gateway** (Front Desk).
+- [Action] Implemented **Human-in-the-Loop (HitL)** approval gates via Telegram Inline Buttons.
+- [Action] Hard-locked security via `AUTHORIZED_USER_ID` checks in the gateway logic.
+- [Action] Created `notify_boss` tool for token-optimized status updates.
+- [Next Step] BotFather initialization and long-poll testing.

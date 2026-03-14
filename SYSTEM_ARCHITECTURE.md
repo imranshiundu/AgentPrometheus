@@ -1,43 +1,35 @@
-# System Architecture: Agent Prometheus (V4.1 - The Hive Mind)
+# System Architecture: Agent Prometheus (V5 - Remote Command)
 
-V4.1 marks the transition to a **Self-Improving Hive Mind** powered by **ChromaDB**. It decouples memory from context windows and implements a persistent Vector-based "Shared Brain."
+V5 introduces the **Telegram Gateway (The Front Desk)**, transforming Prometheus into an asynchronous, remote-accessible workforce.
 
-## 1. Decentralized Memory (Vector Memory Node)
-Prometheus V4.1 utilizes a **Local Vector Database** (ChromaDB) to act as its "Shared Brain." This decouples memory from the LLM's context window, allowing for infinite, token-efficient recall.
+## 1. The "Front Desk" Architecture
+Prometheus is no longer tethered to a local terminal. The Gateway acts as a secure buffer between the user and the Hive Mind.
 
-- **Selective Recall:** Agents query the vector node with their current task. The database returns only the ~2 most relevant past lessons (JSON format), costing near-zero tokens.
-- **Persistent Logic:** Experience is stored in `/shared_workspace/hive_mind_db`, surviving restarts and container wipes.
-- **M2M Lessons:** Successes and failures are automatically converted into embeddings for future similarity searches.
+- **Inbound:** Commands sent via Telegram are pushed to a `prometheus_tasks` Redis queue.
+- **Outbound:** Agents push status updates and milestones to a `prometheus_notifications` queue for Telegram delivery.
 
-## 2. Machine-to-Machine (M2M) Communication
-To slash token costs, we have abolished English for internal communication. Agents now transmit data via **Strict JSON Schemas** over a Redis message queue.
+## 2. Security Guardrails
+- **Hardcoded Identity:** The system explicitly checks the `chat_id`. It will ignore anyone except the authorized creator.
+- **Goal-Oriented Commands:** Only high-level natural language tasks are accepted. Direct "run code" commands from Telegram are prohibited for safety.
 
-- **Human-to-Machine:** English (User Interface).
-- **Machine-to-Human:** English (Reporting).
-- **Machine-to-Machine:** JSON/DSL (Internal Execution).
+## 3. Human-in-the-Loop (HitL) Gates
+The architecture now supports **Interactive Approvals**. 
+- The system will pause execution after generating a `SPEC.md`.
+- It sends an inline button interface to Telegram: **Approve ✅** or **Reject ❌**.
+- The AI agents sleep (saving tokens) until the user provides the "Go" signal.
 
-## 3. The Continuous Learning Loop (Reflection)
-Prometheus now performs a **Post-Mortem** after every task failure or success.
-- **Evaluation:** The CEO Agent analyzes why a task succeeded or failed.
-- **Optimization:** Lessons learned (e.g., "yt-dlp breaks on Python 3.12") are recorded as embeddings in the Vector Node via `record_lesson`.
-- **Pre-Flight Check:** Every new task begins with `get_advice` to fetch relevant past experiences.
-
-## 4. Dynamic Tooling (Agents for Agents)
-The specialist agents can now **request the creation of new tools**.
-- **The Request:** Hermes (The Scout) pings Hephaestus (The Specialist): "I need a custom scraper tool."
-- **The Creation:** Hephaestus writes, tests, and validates the Python script.
-- **The Deployment:** The script is registered as a new "Local Tool" for the Hive Mind.
-
-## 5. Hierarchical Governance (The CEO)
-To prevent the Hive Mind from spiraling, all tool-creation and memory-update requests must be approved by the **CEO Agent** (Powered by Claude 3.5 Sonnet).
+## 4. Token-Optimized Notifications
+To prevent notification bloat, agents only use the `notify_boss` tool at specific milestones:
+1. Task Initialization.
+2. Major Spec/Architecture Approval (HitL).
+3. Final Delivery.
 
 ```mermaid
 graph TD
-    User([User]) <-->|English| CEO[CEO Orchestrator - Claude 3.5]
-    CEO <-->|JSON| Trinity[The Trinity Agents]
-    Trinity <--> VectorDB[(ChromaDB Memory Node)]
-    Trinity <--> Redis[Redis Message Queue]
+    User([User/Phone]) <-->|Telegram| Gateway[Telegram Gateway]
+    Gateway <-->|Redis Queue| CEO[CEO Orchestrator]
+    CEO <-->|Execution| Trinity[Specialist Agents]
     
-    Hephaestus[Specialist] -->|Build Tool| Hermes[Scout]
-    Hermes -->|Data| Hephaestus
+    Trinity -->|Milestone| Gateway
+    Gateway -->|Button Press| CEO
 ```
