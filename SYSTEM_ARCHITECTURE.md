@@ -1,35 +1,45 @@
-# System Architecture: Agent Prometheus (V5 - Remote Command)
+# System Architecture: Agent Prometheus (The Uncrashable Hive Mind)
 
-V5 introduces the **Telegram Gateway (The Front Desk)**, transforming Prometheus into an asynchronous, remote-accessible workforce.
+![Microservices Architecture](microservices_architecture.png)
 
-## 1. The "Front Desk" Architecture
-Prometheus is no longer tethered to a local terminal. The Gateway acts as a secure buffer between the user and the Hive Mind.
+## 1. Multi-API Provider & Fallback (The Keychain)
+Agent Prometheus does not rely on a single brain. It uses a **provider-agnostic keychain** managed by the **LiteLLM Gateway**.
 
-- **Inbound:** Commands sent via Telegram are pushed to a `prometheus_tasks` Redis queue.
-- **Outbound:** Agents push status updates and milestones to a `prometheus_notifications` queue for Telegram delivery.
+### The Hot-Swap Logic
+If Anthropic (Claude) goes down or hits a rate limit, the LiteLLM Gateway intercepts the 500 error and **instantly hot-swaps** the request to a fallback provider (OpenAI). 
+- **Universal Translation:** LiteLLM translates the payload between provider-specific JSON formats (e.g., converting Anthropic's system prompt format to OpenAI's) in milliseconds. 
+- **Continuity:** The agents are unaware the brain changed; they simply receive the next line of logic.
 
-## 2. Security Guardrails
-- **Hardcoded Identity:** The system explicitly checks the `chat_id`. It will ignore anyone except the authorized creator.
-- **Goal-Oriented Commands:** Only high-level natural language tasks are accepted. Direct "run code" commands from Telegram are prohibited for safety.
+## 2. Dynamic Triage (The Dispatcher)
+Every task coming from the Telegram Gateway is processed by the **Triage Agent**.
 
-## 3. Human-in-the-Loop (HitL) Gates
-The architecture now supports **Interactive Approvals**. 
-- The system will pause execution after generating a `SPEC.md`.
-- It sends an inline button interface to Telegram: **Approve ✅** or **Reject ❌**.
-- The AI agents sleep (saving tokens) until the user provides the "Go" signal.
+- **Heuristic Routing:**
+  - **Coding/Refactoring:** Routed to **Claude 3.5 Sonnet** (The best coding syntax).
+  - **Heavy Research/Data:** Routed to **Gemini 1.5 Pro** (Massive 2M context window).
+  - **Orchestration/SSoT:** Routed to **GPT-4o** (Highest obedience to JSON/Specs).
 
-## 4. Token-Optimized Notifications
-To prevent notification bloat, agents only use the `notify_boss` tool at specific milestones:
-1. Task Initialization.
-2. Major Spec/Architecture Approval (HitL).
-3. Final Delivery.
+## 3. The Hive Mind Ledger (State vs. Logic)
+By storing the **Experience Ledger** (ChromaDB) and the **Project Files** (Shared Workspace) locally, we have decoupled the **State** from the **Logic Processor**. 
+- You can swap, upgrade, or add new API keys at any time without resetting the agent's progress or history.
+
+## 4. Communication Architecture
+- **Internal:** M2M JSON Protocol over Redis.
+- **External:** Telegram Gateway with interactive HitL approval gates.
+- **Memory:** Vector Memory Node (Zero-Token Selective Recall).
 
 ```mermaid
 graph TD
-    User([User/Phone]) <-->|Telegram| Gateway[Telegram Gateway]
-    Gateway <-->|Redis Queue| CEO[CEO Orchestrator]
-    CEO <-->|Execution| Trinity[Specialist Agents]
+    User([User Prompt]) --> Triage[Triage Agent - Dispatcher]
     
-    Trinity -->|Milestone| Gateway
-    Gateway -->|Button Press| CEO
+    Triage -->|Rule: Code| Claude[Claude 3.5 Sonnet]
+    Triage -->|Rule: Data| Gemini[Gemini 1.5 Pro]
+    Triage -->|Rule: QA| GPT4o[GPT-4o]
+    
+    subgraph Gateway [LiteLLM Key Chain]
+        Claude -.->|Fallback| GPT4o
+        Gemini -.->|Fallback| Claude
+    end
+    
+    Gateway --> Execution[Project Workspace]
+    Execution <--> HiveDB[(ChromaDB Memory)]
 ```

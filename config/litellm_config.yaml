@@ -1,50 +1,58 @@
 model_list:
-  # 1. THE ORCHESTRATOR & QA GUARDIAN (High Reasoning)
-  # Needs deep logic to manage agents and verify specs.
+  # --- HIGH REASONING MODELS (ORCHESTRATION & QA) ---
   - model_name: orchestrator-model
     litellm_params:
-      model: anthropic/claude-3-5-sonnet-latest 
+      model: anthropic/claude-3-5-sonnet-latest
       api_key: os.environ/ANTHROPIC_API_KEY
-      max_tokens: 4096
+  - model_name: orchestrator-model-fallback
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/REAL_API_KEY
 
-  # 2. THE SPECIALIST / OPENHANDS (Coding Champion)
-  # Claude 3.5 Sonnet is currently the best at strict coding tasks.
+  # --- CODING MODELS (OPENHANDS / SPECIALIST) ---
   - model_name: coding-model
     litellm_params:
       model: anthropic/claude-3-5-sonnet-latest
       api_key: os.environ/ANTHROPIC_API_KEY
-      max_tokens: 8192
+  - model_name: coding-model-fallback
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/REAL_API_KEY
 
-  # 3. THE SCOUT / AUTOGPT (High Volume, Fast)
-  # Web scraping and summarization don't need expensive models.
+  # --- RESEARCH MODELS (AUTOGPT / SCOUT) ---
   - model_name: research-model
     litellm_params:
-      model: gemini/gemini-2.0-flash # Adjusted to 2.0 based on availability
+      model: google/gemini-1.5-pro# Changed to 1.5 Pro for massive context support
       api_key: os.environ/GEMINI_API_KEY
-      max_tokens: 8192
+  - model_name: research-model-fallback
+    litellm_params:
+      model: openai/gpt-3.5-turbo # Cheap & fast fallback
+      api_key: os.environ/REAL_API_KEY
 
-  # 4. THE ARCHITECT & SUMMARIZER (Cheap Logic)
-  # For scaffolding folders or compressing context between handoffs.
+  # --- UTILITY MODELS (SCAFFOLDING / LOGS) ---
   - model_name: utility-model
     litellm_params:
       model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
-      max_tokens: 4096
+      api_key: os.environ/REAL_API_KEY
 
-# --- TOKEN SAVING ARCHITECTURE ---
 litellm_settings:
-  # 1. Enable Caching (The 90% Discount)
-  # This stops agents from paying to re-read their 10k token system prompts on every loop.
+  # Fallback Logic: Automatic Hot-Swapping if an API provider fails or rate-limits
+  fallbacks: 
+    - {"orchestrator-model": ["orchestrator-model-fallback"]}
+    - {"coding-model": ["coding-model-fallback"]}
+    - {"research-model": ["research-model-fallback"]}
+  
+  # The Universal Translator: Standardize all formats across providers
+  drop_params: true
+  set_verbose: false
+
+  # Performance & Savings
   cache: true
   cache_params:
     type: redis
     host: os.environ/REDIS_HOST
     port: 6379
 
-  # 2. Prevent Infinite Loops
-  # Hard cap on the maximum budget any single framework can burn in a session.
-  max_budget: 5.00 # Drops the connection if cost exceeds $5.00
-
-  # 3. Standardize Output Logging
-  # Crucial for tracking exactly which agent is burning the most tokens.
-  success_callback: ["langfuse"] 
+  # Safe Boundaries
+  max_budget: 10.00
+  success_callback: ["langfuse"]

@@ -40,4 +40,7 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Implemented the **Emergency Kill Switch (/stop)** to terminate agents and Docker containers.
 - [Action] Integrated **Voice-to-Text (Whisper)** for mobile task initiation.
 - [Action] Finalized the **Honest Abilities & Boundaries** manifesto.
-- [Milestone] Agent Prometheus Project Completed. The Titan is ready for deployment.
+- [Action] Implemented **Multi-API Fallbacks** and **Hot-Swap** logic in LiteLLM (The Uncrashable Shield).
+- [Action] Integrated the **Triage Agent** for dynamic, heuristic task routing.
+- [Action] Refactored `README.md` into a high-level branding and value-prop dashboard.
+- [Milestone] Agent Prometheus Project Completed. Repository Cleaned and Pushed.

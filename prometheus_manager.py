@@ -7,12 +7,23 @@ from memory_ledger import ExperienceLedger
 
 load_dotenv()
 
-# --- V4.1 ARCHITECTURE: VECTOR-BASED HIVE MIND ---
+# --- V5.1 ARCHITECTURE: DYNAMIC TRIAGE & MULTI-KEY KEYCHAIN ---
 
+llm_triage = ChatOpenAI(model="gpt-4o-mini", openai_api_base="http://litellm:4000/v1")
 llm_ceo = ChatOpenAI(model="orchestrator-model", openai_api_base="http://litellm:4000/v1")
-llm_worker = ChatOpenAI(model="utility-model", openai_api_base="http://litellm:4000/v1")
 llm_research = ChatOpenAI(model="research-model", openai_api_base="http://litellm:4000/v1")
 llm_coding = ChatOpenAI(model="coding-model", openai_api_base="http://litellm:4000/v1")
+
+# The Triage Agent: The Dispatcher Brain
+triage_agent = Agent(
+    role='Triage Dispatcher (The Brain)',
+    goal='Analyze user tasks and route them to the optimal LLM pipeline.',
+    backstory="""You are the first point of contact. You apply heuristics to select models:
+    - Coding/Refactoring -> routing to 'coding-model' (Claude 3.5 Sonnet)
+    - Massive Data/PDFs -> routing to 'research-model' (Gemini 1.5 Pro)
+    - Logic/Architecture -> routing to 'orchestrator-model' (GPT-4o)""",
+    llm=llm_triage
+)
 
 # Initialize the shared brain
 hive_mind_db = ExperienceLedger()
