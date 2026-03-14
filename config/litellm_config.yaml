@@ -3,10 +3,14 @@ model_list:
     litellm_params:
       model: openai/gpt-4
       api_key: "os.environ/REAL_API_KEY"
-  - model_name: gpt-4-turbo
+  - model_name: claude-3-opus
     litellm_params:
-      model: openai/gpt-4-turbo
-      api_key: "os.environ/REAL_API_KEY"
+      model: anthropic/claude-3-opus-20240229
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+  - model_name: gemini-pro
+    litellm_params:
+      model: gemini/gemini-pro
+      api_key: "os.environ/GEMINI_API_KEY"
   - model_name: gpt-3.5-turbo
     litellm_params:
       model: openai/gpt-3.5-turbo

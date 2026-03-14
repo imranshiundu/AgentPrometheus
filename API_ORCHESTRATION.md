@@ -40,7 +40,7 @@ model_list:
 ## 4. Key Benefits
 1. **Budget Capping:** We can set a hard limit at the LiteLLM level. If the "AutoGPT" loop goes rogue and spends $10, the proxy shuts down the connection for all agents.
 2. **Unified Observability:** Every single token spent by any framework is logged in one place. We can see exactly which "agent" (Research vs Coding) is consuming the most resources.
-3. **Provider Agnostic:** If we want to switch from OpenAI to Anthropic, we only change the `config.yaml` in the Proxy. The four frameworks never even know the backend changed.
+3. **Model Agnosticism:** This is the core strength of Agent Prometheus. The LiteLLM Gateway allows you to swap the entire "Brain" (e.g., from OpenAI to **Anthropic Claude**, **Google Gemini**, or **Local Llama 3**) without changing a single line of code in the four underlying frameworks.
 
 ## 5. Security Guardrails
 - **Key Rotation:** One-click rotation at the proxy level.
