@@ -29,4 +29,7 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Established **JSON M2M Protocol** to bypass English filler and slash token costs.
 - [Action] Added **Post-Mortem Reflection** loop to update the Hive Mind after every task.
 - [Action] Configured the **CEO Orchestrator** (Claude 3.5 Sonnet) as the final arbiter for tool creation.
-- [Next Step] Initializing Hive Mind test run.
+- [Action] **Architecture V4.1 Overhaul:** Implemented the **Vector-Based Memory Node** (ChromaDB).
+- [Action] Created `memory_ledger.py` for persistent, token-efficient experience retrieval.
+- [Action] Enforced **HIVE_MIND_CORE_RULES** (Pre-Flight Check & Post-Mortem) in supervisor prompts.
+- [Next Step] Verifying end-to-end vector recall in a test scenario.

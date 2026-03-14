@@ -2,8 +2,11 @@
 
 Agent Prometheus has evolved into a **Self-Improving Hive Mind**. By decoupling memory and adopting Machine-to-Machine (M2M) communication, the Titan now learns from its own history and slashes token costs.
 
-### 1. The Shared Brain (Experience Ledger)
-Prometheus maintains a persistent `experience.json` ledger. Before every task, the Hive Mind reads its past successes and failures, ensuring it never makes the same mistake twice.
+### 1. The Shared Brain (Vector Memory Node)
+Prometheus maintains a persistent **ChromaDB Vector Database** in the shared workspace. 
+- **Pre-Flight Check:** Agents query the database before starting a task to get advice from past similar tasks.
+- **Post-Mortem Learning:** Technical hurdles and successful fixes are embedded and stored for future recall.
+- **Infinite Recall:** Unlike context windows, this memory never fills up and uses minimal tokens.
 
 ### 2. M2M JSON Communication (Token Slashing)
 Internal agent communication has been moved from English to strict **JSON Schemas** over a Redis message queue. This reduces internal "chatter" by up to 60%, saving thousands of tokens per hour.
