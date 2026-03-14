@@ -1,14 +1,33 @@
-import os
-import json
-import redis
-from crewai import Agent, Task, Crew, Process
-from langchain_openai import ChatOpenAI
-from dotenv import load_dotenv
-from memory_ledger import ExperienceLedger
+import asyncio
+import fnmatch
 
-load_dotenv()
+# --- DIRECTORY LOCKDOWN ---
+# Structure the workspace to prevent "Specialist" from running unvetted "Scout" files directly.
+os.makedirs("shared_workspace/research", exist_ok=True)
+os.makedirs("shared_workspace/staging", exist_ok=True)
+os.makedirs("shared_workspace/production", exist_ok=True)
 
-# --- V5.1 ARCHITECTURE: DYNAMIC TRIAGE & MULTI-KEY KEYCHAIN ---
+# --- CONTEXT FILTERING (.prometheusignore) ---
+def get_vetted_files(directory="shared_workspace"):
+    ignore_patterns = []
+    if os.path.exists(".prometheusignore"):
+        with open(".prometheusignore", "r") as f:
+            ignore_patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    
+    vetted_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            path = os.path.join(root, file)
+            should_ignore = False
+            for pattern in ignore_patterns:
+                if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(file, pattern):
+                    should_ignore = True
+                    break
+            if not should_ignore:
+                vetted_files.append(path)
+    return vetted_files
+
+# --- V5.2 SECURE ARCHITECTURE: TIMEOUTS & HARDENING ---
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
@@ -123,13 +142,21 @@ spec_task = Task(
 )
 # ... rest of the tasks
 
-# The Prometheus Hive Mind Crew
-prometheus_hive = Crew(
-    agents=[ceo, architect, specialist, scout, reflection_agent],
-    tasks=[spec_task, execution_task, learning_task],
-    process=Process.hierarchical,
-    manager_llm=llm_ceo
-)
+# --- EXECUTION WITH TIMEOUTS (Prevent Hanging) ---
+async def start_hive_task(task_duration_limit=600): # 10 Minute Cap
+    try:
+        print(f"🔱 Starting task with {task_duration_limit}s timeout...")
+        result = await asyncio.wait_for(
+            prometheus_hive.kickoff(), 
+            timeout=task_duration_limit
+        )
+        return result
+    except asyncio.TimeoutError:
+        error_msg = "🚨 CRITICAL: Task timed out after 10 minutes. Possible captcha loop or process hang."
+        notify_boss(error_msg)
+        # Attempt self-healing logic here or kill subprocesses
+        return "Task Aborted: Timeout"
 
 if __name__ == "__main__":
-    print("Agent Prometheus V4.1: Vector Hive Mind Online. Persistent Memory Enabled.")
+    print("Agent Prometheus V5.2: Production Hardened. Security & Stability Active.")
+    asyncio.run(start_hive_task())

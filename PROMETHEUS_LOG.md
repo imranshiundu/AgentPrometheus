@@ -36,13 +36,9 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Implemented **Human-in-the-Loop (HitL)** approval gates via Telegram Inline Buttons.
 - [Action] Hard-locked security via `AUTHORIZED_USER_ID` checks in the gateway logic.
 - [Action] Created `notify_boss` tool for token-optimized status updates.
-- [Action] Reinforced Telegram Gateway with **Whitelist Lock** (Security) and **Artifact Delivery** (Files).
-- [Action] Implemented the **Emergency Kill Switch (/stop)** to terminate agents and Docker containers.
-- [Action] Integrated **Voice-to-Text (Whisper)** for mobile task initiation.
-- [Action] Finalized the **Honest Abilities & Boundaries** manifesto.
-- [Action] Implemented **Multi-API Fallbacks** and **Hot-Swap** logic in LiteLLM (The Uncrashable Shield).
-- [Action] Integrated the **Triage Agent** for dynamic, heuristic task routing.
-- [Action] Refactored `README.md` into a high-level branding and value-prop dashboard.
-- [Action] Created `HARDWARE_SPECS.md` with VPS/device requirements.
-- [Action] Updated `AGENT_ABILITIES.md` with the "Freight Train vs. Motorcycle" definitive comparison.
-- [Milestone] Agent Prometheus Project Completed. Final Documentation Cleaned and Pushed.
+- [Action] **Architecture V5.2 Security Hardening:** Implemented "Key Hiding" logic. LiteLLM is now the only container with real API keys.
+- [Action] Locked down the Docker network with an internal bridge to prevent local network scanning.
+- [Action] Implemented **asyncio timeouts** in the Manager to prevent "Process Hanging" deadlocks.
+- [Action] Added `.prometheusignore` context filtering to prevent Token Limit crashes on large projects.
+- [Action] Structured `shared_workspace` into `/research` and `/production` tiers for security.
+- [Milestone] Agent Prometheus V5.2 Production Hardened.

@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Central API Gateway
+  # 1. The Central Vault & Gateway (Only container with REAL keys)
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     volumes:
@@ -9,30 +9,41 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - OPENAI_API_KEY=${REAL_API_KEY}
+      - REAL_API_KEY=${REAL_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - REDIS_URL=redis://redis:6379
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
+    networks:
+      - prometheus-internal
 
-  # Hive Mind Memory & Queue
+  # 2. Redis Nervous System
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
+    networks:
+      - prometheus-internal
 
-  # Multi-Agent Manager
+  # 3. The CEO / Orchestrator (Isolated - Talks only to LiteLLM)
   prometheus-manager:
     build: 
       context: ./
       dockerfile: docker/Manager.Dockerfile
     volumes:
-      - ./shared_workspace:/app/workspace
+      - ./shared_workspace:/app/shared_workspace
       - ./prometheus_manager.py:/app/prometheus_manager.py
+      - ./memory_ledger.py:/app/memory_ledger.py
+      - ./.prometheusignore:/app/.prometheusignore
     environment:
       - OPENAI_API_BASE=http://litellm:4000/v1
-      - OPENAI_API_KEY=sk-prometheus-dummy-key
+      - OPENAI_API_KEY=sk-prometheus-dummy-internal-key # Key Hiding
+      - REDIS_HOST=redis
     depends_on:
       - litellm
+      - redis
+    networks:
+      - prometheus-internal
 
-  # Specialized Nodes (Placeholders for now)
-  # In production, these would be separate containers for OpenHands and AutoGPT
-  # sharing the same network and workspace.
+networks:
+  prometheus-internal:
+    driver: bridge
+    internal: true # BLOCK outbound internet for the Orchestrator for safety. 
+    # Specialist & Scout will use separate dynamic containers managed by the CEO.

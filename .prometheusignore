@@ -1,0 +1,13 @@
+node_modules
+venv
+.git
+.DS_Store
+__pycache__
+*.pyc
+.pytest_cache
+*.log
+shared_workspace/hive_mind_db
+docker
+.env
+logo.png
+microservices_architecture.png
