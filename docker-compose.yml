@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # Central API Gateway
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    volumes:
+      - ./config/litellm_config.yaml:/app/config.yaml
+    ports:
+      - "4000:4000"
+    environment:
+      - OPENAI_API_KEY=${REAL_API_KEY}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
+
+  # Multi-Agent Manager
+  prometheus-manager:
+    build: 
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    volumes:
+      - ./shared_workspace:/app/workspace
+      - ./prometheus_manager.py:/app/prometheus_manager.py
+    environment:
+      - OPENAI_API_BASE=http://litellm:4000/v1
+      - OPENAI_API_KEY=sk-prometheus-dummy-key
+    depends_on:
+      - litellm
+
+  # Specialized Nodes (Placeholders for now)
+  # In production, these would be separate containers for OpenHands and AutoGPT
+  # sharing the same network and workspace.
