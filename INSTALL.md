@@ -12,6 +12,8 @@ Before starting, ensure you have the following installed:
 3.  **Git**.
 4.  **A Telegram Bot Token** (Get this from [@BotFather](https://t.me/botfather)).
 5.  **Your Telegram Chat ID** (Get this from [@userinfobot](https://t.me/userinfobot)).
+    > [!IMPORTANT]
+    > **SECURITY CRITICAL:** You MUST enter your specific Telegram `CHAT_ID` in the `.env` file. The Gateway will hard-reject any commands from unauthorized IDs to prevent remote code execution attacks from strangers.
 
 ---
 

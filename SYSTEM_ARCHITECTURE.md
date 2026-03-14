@@ -19,7 +19,7 @@ Every task coming from the Telegram Gateway is processed by the **Triage Agent**
   - **Orchestration/SSoT:** Routed to **GPT-4o** (Highest obedience to JSON/Specs).
 
 ## 3. The Hive Mind Ledger (State vs. Logic)
-By storing the **Experience Ledger** (ChromaDB) and the **Project Files** (Shared Workspace) locally, we have decoupled the **State** from the **Logic Processor**. 
+By storing the **Experience Ledger** (ChromaDB) and the **Project Files** (Workspace) locally, we have decoupled the **State** from the **Logic Processor**. 
 - You can swap, upgrade, or add new API keys at any time without resetting the agent's progress or history.
 
 ## 4. Communication Architecture

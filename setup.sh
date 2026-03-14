@@ -30,9 +30,11 @@ EOF
 fi
 
 # 3. Directory Preparation
-echo "📁 Preparing shared workspace..."
-mkdir -p shared_workspace/hive_mind_db
-mkdir -p workspace
+echo "📁 Preparing local workspace..."
+mkdir -p workspace/hive_mind_db
+mkdir -p workspace/research
+mkdir -p workspace/staging
+mkdir -p workspace/production
 
 # 4. Python Environment
 echo "🐍 Setting up Python environment..."

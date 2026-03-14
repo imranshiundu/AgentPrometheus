@@ -28,7 +28,7 @@ services:
       context: ./
       dockerfile: docker/Manager.Dockerfile
     volumes:
-      - ./shared_workspace:/app/shared_workspace
+      - ./workspace:/app/workspace
       - ./prometheus_manager.py:/app/prometheus_manager.py
       - ./memory_ledger.py:/app/memory_ledger.py
       - ./.prometheusignore:/app/.prometheusignore

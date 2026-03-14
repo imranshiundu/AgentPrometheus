@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 
 class ExperienceLedger:
-    def __init__(self, db_path="/home/imran/Code/agent_frameworks/shared_workspace/hive_mind_db"):
+    def __init__(self, db_path="./workspace/hive_mind_db"):
         """Initializes the local, persistent memory node."""
         # Ensure the path exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)

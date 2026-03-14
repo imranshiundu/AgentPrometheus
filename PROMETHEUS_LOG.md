@@ -41,4 +41,8 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Implemented **asyncio timeouts** in the Manager to prevent "Process Hanging" deadlocks.
 - [Action] Added `.prometheusignore` context filtering to prevent Token Limit crashes on large projects.
 - [Action] Structured `shared_workspace` into `/research` and `/production` tiers for security.
-- [Milestone] Agent Prometheus V5.2 Production Hardened.
+- [Action] Created `USAGE_GUIDE.md` with concrete task examples for non-technical users.
+- [Action] Standardized workspace naming to `workspace/` across all files for consistency.
+- [Action] Fixed Docker networking bugs in `API_ORCHESTRATION.md` (localhost -> host bridge).
+- [Action] Hard-locked Telegram security with clearer `CHAT_ID` warnings in installation docs.
+- [Milestone] Agent Prometheus V5.2.1 Finalized and Pushed.

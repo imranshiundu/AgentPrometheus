@@ -34,11 +34,15 @@ We use `success_callback: ["langfuse"]` to monitor exactly which agent is consum
 We don't rewrite the sub-frameworks. We simply "hijack" their connection via environment variables in the central `.env`:
 
 ```bash
-# Force OpenHands to talk to the local switchboard
-OPENHANDS_OPENAI_API_BASE=http://localhost:4000
+# Force OpenHands to talk to the local switchboard via the Docker host bridge
+# For Mac/Windows (Docker Desktop):
+OPENHANDS_OPENAI_API_BASE=http://host.docker.internal:4000
+# For Linux Native Docker:
+# OPENHANDS_OPENAI_API_BASE=http://172.17.0.1:4000
+
 OPENHANDS_OPENAI_MODEL_NAME=coding-model
 
 # Force AutoGPT to use the economy model
-AUTOGPT_OPENAI_API_BASE=http://localhost:4000
+AUTOGPT_OPENAI_API_BASE=http://host.docker.internal:4000
 AUTOGPT_OPENAI_MODEL_NAME=research-model
 ```

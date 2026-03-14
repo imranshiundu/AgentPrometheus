@@ -51,6 +51,7 @@ Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes task
 ---
 
 ## 📖 Project Documentation
+- [Usage Guide](USAGE_GUIDE.md) - **Recommended for beginners. How to command the bot.**
 - [Installation Guide](INSTALL.md) - **Step-by-step setup for Linux, Mac, and WSL2.**
 - [System Architecture](SYSTEM_ARCHITECTURE.md) - **Triage, Hot-Swaps, and M2M Protocols.**
 - [Agent Abilities](AGENT_ABILITIES.md) - **Master Capabilities & OpenClaw Comparison.**

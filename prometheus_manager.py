@@ -3,12 +3,12 @@ import fnmatch
 
 # --- DIRECTORY LOCKDOWN ---
 # Structure the workspace to prevent "Specialist" from running unvetted "Scout" files directly.
-os.makedirs("shared_workspace/research", exist_ok=True)
-os.makedirs("shared_workspace/staging", exist_ok=True)
-os.makedirs("shared_workspace/production", exist_ok=True)
+os.makedirs("workspace/research", exist_ok=True)
+os.makedirs("workspace/staging", exist_ok=True)
+os.makedirs("workspace/production", exist_ok=True)
 
 # --- CONTEXT FILTERING (.prometheusignore) ---
-def get_vetted_files(directory="shared_workspace"):
+def get_vetted_files(directory="workspace"):
     ignore_patterns = []
     if os.path.exists(".prometheusignore"):
         with open(".prometheusignore", "r") as f:
