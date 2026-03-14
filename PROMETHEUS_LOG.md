@@ -41,8 +41,9 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Implemented **asyncio timeouts** in the Manager to prevent "Process Hanging" deadlocks.
 - [Action] Added `.prometheusignore` context filtering to prevent Token Limit crashes on large projects.
 - [Action] Structured `shared_workspace` into `/research` and `/production` tiers for security.
-- [Action] **Architecture V5.3: Prometheus Command Center (Web Dashboard).**
-- [Action] Built a glassmorphic React/Next.js dashboard for real-time telemetry.
-- [Action] Implemented a FastAPI backend to stream Redis logs via WebSockets.
-- [Action] Integrated live agent activity indicators and budget monitoring into the UI.
-- [Milestone] Agent Prometheus V5.3: Command Center Online.
+- [Action] **Architecture V5.4: Vision Nodes & Remote Hands.**
+- [Action] Built `vision_server.py` (Receiver) to bridge remote VPS to local client sight.
+- [Action] Integrated `/connect <PIN>` pairing logic in the Telegram Gateway.
+- [Action] Added `remote_see` and `remote_action` tools to the Prometheus Manager.
+- [Action] Created `REMOTE_CONTROL.md` security manifesto and usage guide.
+- [Milestone] Agent Prometheus V5.4: Vision & Remote Hands Online.

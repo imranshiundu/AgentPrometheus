@@ -29,7 +29,21 @@ async def check_auth(update: Update):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Initialize the connection."""
     if not await check_auth(update): return
-    await update.message.reply_text("🔱 Agent Prometheus Online. Send me a task to begin the forge.")
+    await update.message.reply_text("🔱 Agent Prometheus Online. Send me a task to begin the forge.\n\nUse /connect <PIN> to pair a local Vision Node.")
+
+async def connect_vision(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Pair a local Vision Node using a 6-digit PIN."""
+    if not await check_auth(update): return
+    
+    if not context.args:
+        await update.message.reply_text("❌ Please provide a PIN. Example: /connect 834912")
+        return
+
+    pin = context.args[0]
+    # Store authorized PIN in Redis with a 1-hour expiration
+    r.set(f"prometheus_auth_pin:{pin}", "authorized", ex=3600)
+    
+    await update.message.reply_text(f"🔐 PIN {pin} Authorized. Waiting for the local Vision Node to handshake...")
 
 async def handle_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inbound: Receive task and push to the Orchestrator."""
@@ -132,6 +146,7 @@ if __name__ == '__main__':
     
     # Handlers
     application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('connect', connect_vision)) # Vision Node Pairing
     application.add_handler(CommandHandler('stop', stop_execution)) # New Kill Switch
     application.add_handler(MessageHandler(filters.VOICE, handle_voice)) # New Voice Support
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_task))

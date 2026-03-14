@@ -73,6 +73,23 @@ services:
       - prometheus-public
       - prometheus-internal
 
+  # 6. Remote Vision & Hands Bridge (The Receiver)
+  vision-bridge:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    volumes:
+      - ./vision_server.py:/app/vision_server.py
+    ports:
+      - "8765:8765"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - prometheus-public
+      - prometheus-internal
+
 networks:
   prometheus-internal:
     driver: bridge

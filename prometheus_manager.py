@@ -61,6 +61,20 @@ triage_agent = Agent(
 # Initialize the shared brain
 hive_mind_db = ExperienceLedger()
 
+# --- V5.4 VISION & REMOTE HANDS (Remote Control) ---
+def remote_see(pin):
+    """Retrieves the latest screenshot from a paired Vision Node."""
+    screenshot_b64 = r.get(f"prometheus_eyes:{pin}")
+    if not screenshot_b64:
+        return "ERROR: No paired Vision Node found or stream is inactive."
+    return screenshot_b64 # The agent/CEO can now 'see' this image
+
+def remote_action(pin, action, **kwargs):
+    """Sends a mouse or keyboard command to the paired Vision Node."""
+    payload = {"pin": pin, "action": action, **kwargs}
+    r.lpush(f"prometheus_hands:{pin}", json.dumps(payload))
+    return f"SUCCESS: Action '{action}' sent to Remote Node {pin}."
+
 # --- THE HIVE MIND CORE RULES ---
 HIVE_MIND_CORE_RULES = """
 * RULE 1 (Pre-Flight Check): Before executing any multi-step coding task or complex terminal command, you MUST use the `get_advice` tool with a description of your task. 
