@@ -1,4 +1,3 @@
-import json
 import chromadb
 from datetime import datetime
 import os
@@ -11,7 +10,7 @@ class ExperienceLedger:
         if chroma_host:
             # Connect to the remote ChromaDB container (Titan Class)
             self.client = chromadb.HttpClient(host=chroma_host, port=8000)
-            print(f"🧠 Hive Mind connected to remote ChromaDB at {chroma_host}")
+            print(f"🧠 Hive Mind connected to remote ChromaDB at {chroma_host}:8000")
         else:
             # Fallback to local persistent storage
             os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -26,17 +25,16 @@ class ExperienceLedger:
         """
         lesson_id = f"lesson_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Structure the memory strictly to avoid token bloat
-        memory_payload = json.dumps({
-            "context": task_context,
-            "failed_approach": what_failed,
-            "successful_solution": the_fix
-        })
-
-        # We embed the task_context so future agents can search by similarity
+        # 🧪 MATHEMATICAL OPTIMIZATION: 
+        # We ONLY embed the context so the vector math stays pure and high-recall.
+        # The actual lessons (failures/fixes) are stored safely in the metadata.
         self.collection.add(
-            documents=[memory_payload],
-            metadatas=[{"type": "system_learning"}],
+            documents=[task_context], 
+            metadatas=[{
+                "type": "system_learning",
+                "failed_approach": what_failed,
+                "successful_solution": the_fix
+            }],
             ids=[lesson_id]
         )
         return f"SUCCESS: Lesson {lesson_id} permanently recorded to the Hive Mind."
@@ -45,9 +43,8 @@ class ExperienceLedger:
         """
         Agents use this tool BEFORE writing code or running commands.
         """
-        # Search the database for tasks that sound similar to the current one
-        # Note: ChromaDB requires an embedding function. If none provided, it uses a default one.
         try:
+            # Search the database strictly against the clean context strings
             results = self.collection.query(
                 query_texts=[current_task],
                 n_results=max_results
@@ -57,9 +54,20 @@ class ExperienceLedger:
             if not results['documents'] or not results['documents'][0]:
                 return "No prior experience found for this exact task. You may proceed."
             
-            # Return only the highly relevant past lessons
-            retrieved_lessons = "\n".join(results['documents'][0])
+            # Reconstruct the lesson format for the LLM to understand
+            lessons = []
+            for doc, meta in zip(results['documents'][0], results['metadatas'][0]):
+                formatted_lesson = (
+                    f"SIMILAR PAST TASK: {doc}\n"
+                    f"WHAT WE TRIED & FAILED: {meta.get('failed_approach', 'N/A')}\n"
+                    f"THE WORKING FIX: {meta.get('successful_solution', 'N/A')}\n"
+                    f"---"
+                )
+                lessons.append(formatted_lesson)
+            
+            retrieved_lessons = "\n".join(lessons)
             return f"CRITICAL PAST LESSONS TO APPLY:\n{retrieved_lessons}"
+            
         except Exception as e:
             return f"No prior experience found. (Error: {str(e)})"
 
@@ -76,4 +84,4 @@ if __name__ == "__main__":
     
     # 2. A week later, a new agent is asked to download a video
     advice = hive_mind.get_advice("Write a script to download a YouTube video on a Mac")
-    print(advice) 
+    print(advice)
