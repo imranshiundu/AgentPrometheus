@@ -1,3 +1,9 @@
+# Agent Prometheus 🔱
+
+![Agent Prometheus Logo](logo.png)
+
+**The Titan-Class AI Orchestrator & Self-Improving Hive Mind.**
+
 Agent Prometheus is a high-performance Meta-Framework that unifies the world's most specialized AI agents—**AutoGPT, OpenHands, crewAI, and gpt-engineer**—into a single, uncrashable entity.
 
 > [!IMPORTANT]
@@ -27,7 +33,25 @@ Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes task
 
 ---
 
+## 🚀 Quick Start
+
+1. **Clone & Setup:**
+   ```bash
+   git clone https://github.com/imranshiundu/AgentPrometheus.git
+   cd AgentPrometheus
+   ./setup.sh
+   ```
+2. **Configure:** Update the `.env` file with your API keys.
+3. **Launch:**
+   ```bash
+   docker-compose up -d
+   python telegram_gateway.py
+   ```
+
+---
+
 ## 📖 Project Documentation
+- [Installation Guide](INSTALL.md) - **Step-by-step setup for Linux, Mac, and WSL2.**
 - [System Architecture](SYSTEM_ARCHITECTURE.md) - **Triage, Hot-Swaps, and M2M Protocols.**
 - [Agent Abilities](AGENT_ABILITIES.md) - **Master Capabilities & OpenClaw Comparison.**
 - [Hardware Specs](HARDWARE_SPECS.md) - **VPS Requirements & Device Compatibility.**

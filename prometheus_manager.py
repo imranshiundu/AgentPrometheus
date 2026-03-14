@@ -1,5 +1,6 @@
 import os
 import json
+import redis
 from crewai import Agent, Task, Crew, Process
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
@@ -8,6 +9,9 @@ from memory_ledger import ExperienceLedger
 load_dotenv()
 
 # --- V5.1 ARCHITECTURE: DYNAMIC TRIAGE & MULTI-KEY KEYCHAIN ---
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
 llm_triage = ChatOpenAI(model="gpt-4o-mini", openai_api_base="http://litellm:4000/v1")
 llm_ceo = ChatOpenAI(model="orchestrator-model", openai_api_base="http://litellm:4000/v1")
