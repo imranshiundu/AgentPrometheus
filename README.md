@@ -62,16 +62,17 @@ pip install crewai langchain-openai litellm python-dotenv
 ### Agent Ability Matrix
 | Agent | Role | Capability | Powered By |
 | :--- | :--- | :--- | :--- |
-| **Architect (Titan)** | Structural Design | Project Scaffolding | gpt-engineer |
-| **Specialist (Hephaestus)** | Core Development | Coding & Sandboxed Debugging | OpenHands |
-| **Scout (Hermes)** | Intelligence | Autonomous Web Research | AutoGPT |
-| **Orchestrator** | Management | Delegation & QA | crewAI |
+| **Architect (Titan)** | Structural Design | Project Scaffolding / Campaign Outlining | gpt-engineer |
+| **Specialist (Hephaestus)** | Execution | Coding, Debugging & Data Processing | OpenHands |
+| **Scout (Hermes)** | Intelligence | Autonomous Web & Market Research | AutoGPT |
+| **Orchestrator** | Management | Multi-Scenario Delegation & QA | crewAI |
 
-### Technical Specifications
-- **Orchestration:** crewAI (Hierarchical & Sequential processes)
-- **LLM Proxy:** LiteLLM (Unified cost control & monitoring)
-- **Database/Workspace:** Shared local volume mount (`/shared_workspace`)
-- **Network:** Isolated Docker Bridge for inter-agent communication
+### Why Agent Prometheus?
+While tools like **OpenClaw** excel at operational personal assistance (Email, WhatsApp, Calendar), **Agent Prometheus** is a "Reasoning Forge." It is designed to **build, research, and innovate**. 
+
+- **Adaptive Scenarios:** Whether you are a Marketer, Researcher, or Developer, the Prometheus Trinity adapts its roles to your domain.
+- **Auto-Correction:** The Specialist can fix code errors that the Scout finds documentation for in real-time.
+- **Single Identity:** Powered by a LiteLLM Gateway for unified cost and key management.
 
 ---
 
