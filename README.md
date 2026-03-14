@@ -75,10 +75,11 @@ AUTOGPT_OPENAI_MODEL_NAME=research-model
 ---
 
 ## 📖 Operational Documentation
-- [System Architecture](SYSTEM_ARCHITECTURE.md) - Deep dive into the V2 execution lifecycle.
-- [Agent Abilities](AGENT_ABILITIES.md) - Updated for the new "Refiner" and "Summarizer" roles.
+- [System Architecture](SYSTEM_ARCHITECTURE.md) - Deep dive into the V5 execution lifecycle.
+- [Agent Abilities](AGENT_ABILITIES.md) - Deep dive into technical synergies and roles.
+- [Honest Abilities](HONEST_ABILITIES.md) - **CRITICAL:** What the Titan can and cannot do.
 - [API Orchestration](API_ORCHESTRATION.md) - Guide to the Tiered Routing and LiteLLM Proxy.
-- [Development Log](PROMETHEUS_LOG.md) - The chronicle of the V2 refactor.
+- [Development Log](PROMETHEUS_LOG.md) - The chronicle of the project.
 
 ## 🧹 Maintenance
 To reset the global state and workspace:

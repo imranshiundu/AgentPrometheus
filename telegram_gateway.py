@@ -58,24 +58,70 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r.set("prometheus_approval", "rejected")
         await query.edit_message_text(text="❌ Spec Rejected. Task aborted.")
 
+async def stop_execution(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Emergency Kill Switch: Stop all agents and Docker containers."""
+    if not await check_auth(update): return
+    
+    # Send kill signal via Redis
+    r.set("prometheus_kill_switch", "true")
+    
+    # Also attempt a local docker-compose stop
+    import subprocess
+    try:
+        subprocess.run(["docker-compose", "stop"], check=True)
+        await update.message.reply_text("🛑 EMERGENCY STOP: All agent loops signaled and Docker containers halted.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Kill switch triggered, but Docker stop failed: {e}")
+
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Voice-to-Text Initiation: Transcribe memo via Whisper."""
+    if not await check_auth(update): return
+    
+    voice_file = await context.bot.get_file(update.message.voice.file_id)
+    file_path = "workspace/voice_task.ogg"
+    await voice_file.download_to_drive(file_path)
+    
+    await update.message.reply_text("🎤 Voice note received. Transcribing via Whisper...")
+    
+    # Simple transcription logic (assumes openai client initialized or uses litellm gateway)
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("REAL_API_KEY"))
+        audio_file = open(file_path, "rb")
+        transcription = client.audio.transcriptions.create(
+            model="whisper-1", 
+            file=audio_file
+        )
+        task_text = transcription.text
+        await update.message.reply_text(f"📝 Transcribed Task: \"{task_text}\"\n\nStarting the forge...")
+        
+        # Push to Redis Queue
+        task_payload = {"chat_id": update.effective_chat.id, "task": task_text, "status": "pending_spec"}
+        r.lpush("prometheus_tasks", json.dumps(task_payload))
+    except Exception as e:
+        await update.message.reply_text(f"❌ Transcription failed: {e}")
+
 async def poll_outbound(context: ContextTypes.DEFAULT_TYPE):
-    """Outbound: Poll Redis for agent notifications."""
+    """Outbound: Poll Redis for agent notifications and file deliveries."""
     message = r.rpop("prometheus_notifications")
     if message:
         payload = json.loads(message)
         chat_id = payload.get("chat_id", AUTHORIZED_USER_ID)
-        text = payload.get("text", "Notification received.")
+        text = payload.get("text")
         is_approval_gate = payload.get("approval_gate", False)
+        file_path = payload.get("file_path") # New: Support for artifact delivery
         
-        if is_approval_gate:
+        if file_path and os.path.exists(file_path):
+            await context.bot.send_document(chat_id=chat_id, document=open(file_path, 'rb'), caption=text)
+        elif is_approval_gate:
             keyboard = [
                 [InlineKeyboardButton("✅ Approve", callback_data="approve")],
                 [InlineKeyboardButton("❌ Reject", callback_data="reject")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup, parse_mode='Markdown')
         else:
-            await context.bot.send_message(chat_id=chat_id, text=text)
+            await context.bot.send_message(chat_id=chat_id, text=text, parse_mode='Markdown')
 
 if __name__ == '__main__':
     if not TELEGRAM_TOKEN:
@@ -86,6 +132,8 @@ if __name__ == '__main__':
     
     # Handlers
     application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('stop', stop_execution)) # New Kill Switch
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice)) # New Voice Support
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_task))
     application.add_handler(CallbackQueryHandler(button_callback))
     

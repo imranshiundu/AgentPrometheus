@@ -62,11 +62,12 @@ reflection_agent = Agent(
 )
 
 # --- TELEGRAM HITL COMMUNICATION ---
-def notify_boss(text, approval_gate=False):
-    """Pushes a notification to the Telegram Gateway via Redis."""
+def notify_boss(text, approval_gate=False, file_path=None):
+    """Pushes a notification or file to the Telegram Gateway via Redis."""
     payload = {
         "text": text,
-        "approval_gate": approval_gate
+        "approval_gate": approval_gate,
+        "file_path": file_path
     }
     r.lpush("prometheus_notifications", json.dumps(payload))
     
@@ -75,11 +76,22 @@ def notify_boss(text, approval_gate=False):
         # Block until approval is received in Redis
         r.delete("prometheus_approval")
         while True:
+            # Check for Kill Switch
+            if r.get("prometheus_kill_switch") == "true":
+                r.set("prometheus_kill_switch", "false")
+                raise Exception("CRITICAL: Manual /stop command received via Telegram. Terminating session.")
+
             approval = r.get("prometheus_approval")
             if approval == "approved":
                 return "User approved the request."
             elif approval == "rejected":
                 raise Exception("User rejected the request. Aborting task.")
+
+def check_kill_switch():
+    """Non-blocking check for the /stop command."""
+    if r.get("prometheus_kill_switch") == "true":
+        r.set("prometheus_kill_switch", "false")
+        raise Exception("CRITICAL: Manual /stop command received via Telegram. Terminating session.")
 
 # --- V4.1 TASKS: HIVE EXECUTION ---
 
