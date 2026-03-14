@@ -40,10 +40,28 @@ async def connect_vision(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     pin = context.args[0]
-    # Store authorized PIN in Redis with a 1-hour expiration
+    
+    # 1. Store authorized PIN in Redis for the Manager
     r.set(f"prometheus_auth_pin:{pin}", "authorized", ex=3600)
     
-    await update.message.reply_text(f"🔐 PIN {pin} Authorized. Waiting for the local Vision Node to handshake...")
+    # 2. Write PIN to workspace file for the VPS Receiver
+    try:
+        os.makedirs("workspace", exist_ok=True)
+        with open("workspace/active_vision_pin.txt", "w") as f:
+            f.write(pin)
+    except Exception as e:
+        logging.error(f"Failed to write PIN file: {e}")
+
+    vps_ip = os.getenv("VPS_PUBLIC_IP", "YOUR_VPS_IP")
+    
+    install_msg = (
+        f"🔐 **PIN {pin} Authorized.**\n\n"
+        f"To grant Prometheus access to your laptop, run this command in your terminal:\n\n"
+        f"**Mac/Linux:**\n`curl -sL http://{vps_ip}:8000/vision_node.py | python3`\n\n"
+        f"**Windows (PowerShell):**\n`iwr -useb http://{vps_ip}:8000/vision_node.py | iex`"
+    )
+    
+    await update.message.reply_text(install_msg, parse_mode='Markdown')
 
 async def handle_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inbound: Receive task and push to the Orchestrator."""

@@ -79,6 +79,7 @@ def remote_action(pin, action, **kwargs):
 HIVE_MIND_CORE_RULES = """
 * RULE 1 (Pre-Flight Check): Before executing any multi-step coding task or complex terminal command, you MUST use the `get_advice` tool with a description of your task. 
 * RULE 2 (Post-Mortem): If you attempt a solution that results in an error, and you eventually find a working fix, you MUST use the `record_lesson` tool. Detail exactly what failed and the specific code/command that fixed it.
+* RULE 3 (Vision & Remote Control): You have the physical ability to control the user's local computer. If a task requires GUI interaction (opening browsers locally, clicking apps, trading on websites), ask the user to pair their 'Vision Node'. Provide them the command: `Use /connect in Telegram to begin pairing.` Once paired, you can 'see' via `remote_see()` and 'act' via `remote_action()`.
 """
 
 # --- THE CEO: HIERARCHICAL SUPERVISOR ---

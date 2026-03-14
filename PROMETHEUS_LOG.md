@@ -41,9 +41,9 @@ This log tracks every technical decision and implementation step for the Agent P
 - [Action] Implemented **asyncio timeouts** in the Manager to prevent "Process Hanging" deadlocks.
 - [Action] Added `.prometheusignore` context filtering to prevent Token Limit crashes on large projects.
 - [Action] Structured `shared_workspace` into `/research` and `/production` tiers for security.
-- [Action] **Architecture V5.4: Vision Nodes & Remote Hands.**
-- [Action] Built `vision_server.py` (Receiver) to bridge remote VPS to local client sight.
-- [Action] Integrated `/connect <PIN>` pairing logic in the Telegram Gateway.
-- [Action] Added `remote_see` and `remote_action` tools to the Prometheus Manager.
-- [Action] Created `REMOTE_CONTROL.md` security manifesto and usage guide.
-- [Milestone] Agent Prometheus V5.4: Vision & Remote Hands Online.
+- [Action] **Architecture V5.5: Plug-and-Play Vision (Zero-Friction Control).**
+- [Action] Automated VPS visual cortex with `vps_receiver.py` and automatic PIN validation.
+- [Action] Implemented one-line laptop deployment command (piping remote script to python).
+- [Action] Made Prometheus "Self-Aware" of its remote control abilities via core rules.
+- [Action] Added static serving of `vision_node.py` through the FastAPI backend.
+- [Milestone] Agent Prometheus V5.5: Zero-Friction Remote Control Online.

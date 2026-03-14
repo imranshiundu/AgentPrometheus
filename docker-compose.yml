@@ -79,7 +79,8 @@ services:
       context: ./
       dockerfile: docker/Manager.Dockerfile
     volumes:
-      - ./vision_server.py:/app/vision_server.py
+      - ./vps_receiver.py:/app/vps_receiver.py
+    command: ["python", "vps_receiver.py"]
     ports:
       - "8765:8765"
     environment:

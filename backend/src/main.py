@@ -2,6 +2,7 @@ import os
 import redis
 import json
 from fastapi import FastAPI, WebSocket
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 
@@ -17,6 +18,10 @@ app.add_middleware(
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+
+@app.get("/vision_node.py")
+async def get_vision_node():
+    return FileResponse("vision_node.py")
 
 @app.get("/stats")
 async def get_stats():
