@@ -32,6 +32,16 @@ def get_vetted_files(directory="workspace"):
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
+def dashboard_log(msg, agent="system"):
+    """Pushes a log entry to Redis for the Web Dashboard."""
+    payload = {
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "type": agent.lower(),
+        "msg": msg
+    }
+    r.lpush("prometheus_logs", json.dumps(payload))
+    print(f"[{agent.upper()}] {msg}")
+
 llm_triage = ChatOpenAI(model="gpt-4o-mini", openai_api_base="http://litellm:4000/v1")
 llm_ceo = ChatOpenAI(model="orchestrator-model", openai_api_base="http://litellm:4000/v1")
 llm_research = ChatOpenAI(model="research-model", openai_api_base="http://litellm:4000/v1")
@@ -143,19 +153,25 @@ spec_task = Task(
 # ... rest of the tasks
 
 # --- EXECUTION WITH TIMEOUTS (Prevent Hanging) ---
-async def start_hive_task(task_duration_limit=600): # 10 Minute Cap
+async def start_hive_task(task_description, timeout=600):
+    dashboard_log(f"Received new task: {task_description}", "ceo")
     try:
-        print(f"🔱 Starting task with {task_duration_limit}s timeout...")
+        dashboard_log("Initializing Architect for Spec drafting...", "architect")
+        # Actual Crew Execution
         result = await asyncio.wait_for(
-            prometheus_hive.kickoff(), 
-            timeout=task_duration_limit
+            prometheus_hive.kickoff(inputs={'task': task_description}), 
+            timeout=timeout
         )
+        dashboard_log("Task completed successfully.", "ceo")
         return result
     except asyncio.TimeoutError:
-        error_msg = "🚨 CRITICAL: Task timed out after 10 minutes. Possible captcha loop or process hang."
+        error_msg = "🚨 CRITICAL: Task timed out after 10 minutes."
+        dashboard_log(error_msg, "system")
         notify_boss(error_msg)
-        # Attempt self-healing logic here or kill subprocesses
         return "Task Aborted: Timeout"
+    except Exception as e:
+        dashboard_log(f"Task failed: {e}", "ceo")
+        return f"Error: {e}"
 
 if __name__ == "__main__":
     print("Agent Prometheus V5.2: Production Hardened. Security & Stability Active.")

@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. The Central Vault & Gateway (Only container with REAL keys)
+  # 1. Central API Gateway
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     volumes:
@@ -14,6 +14,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - REDIS_URL=redis://redis:6379
     networks:
+      - prometheus-public
       - prometheus-internal
 
   # 2. Redis Nervous System
@@ -22,7 +23,7 @@ services:
     networks:
       - prometheus-internal
 
-  # 3. The CEO / Orchestrator (Isolated - Talks only to LiteLLM)
+  # 3. The CEO / Orchestrator (Securely Isolated)
   prometheus-manager:
     build: 
       context: ./
@@ -34,7 +35,7 @@ services:
       - ./.prometheusignore:/app/.prometheusignore
     environment:
       - OPENAI_API_BASE=http://litellm:4000/v1
-      - OPENAI_API_KEY=sk-prometheus-dummy-internal-key # Key Hiding
+      - OPENAI_API_KEY=sk-prometheus-dummy-internal-key
       - REDIS_HOST=redis
     depends_on:
       - litellm
@@ -42,8 +43,39 @@ services:
     networks:
       - prometheus-internal
 
+  # 4. Web Dashboard (Frontend)
+  dashboard:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./dashboard:/app
+    ports:
+      - "5173:5173"
+    command: ["npm", "run", "dev", "--", "--host"]
+    networks:
+      - prometheus-public
+
+  # 5. Dashboard Backend
+  backend:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    volumes:
+      - ./backend:/app
+      - ./workspace:/app/workspace
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - prometheus-public
+      - prometheus-internal
+
 networks:
   prometheus-internal:
     driver: bridge
-    internal: true # BLOCK outbound internet for the Orchestrator for safety. 
-    # Specialist & Scout will use separate dynamic containers managed by the CEO.
+    internal: true # EXTREME SECURITY: Block manager from all internet access.
+  prometheus-public:
+    driver: bridge # Standard bridge for UI and API connectivity.

@@ -36,12 +36,15 @@ mkdir -p workspace/research
 mkdir -p workspace/staging
 mkdir -p workspace/production
 
-# 4. Python Environment
+# 4. Python & Dashboard Environment
 echo "🐍 Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+
+echo "⚛️ Setting up Web Dashboard..."
+cd dashboard && npm install && cd ..
 
 # 5. Docker Infrastructure
 echo "🐳 Pulling Docker infrastructure..."
