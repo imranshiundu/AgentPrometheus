@@ -1,45 +1,50 @@
 model_list:
-  # Claude-only model aliases for Consultant Mode.
-  # The system performs deterministic scanning, queueing, testing, and file handling.
-  # Claude is used as the consultant: planner, reviewer, risk analyst, and final critic.
+  # Provider-neutral aliases. Agent Prometheus does the scanning, testing,
+  # queueing, patch application, and reporting. The model is only consulted.
+  # This lets the runtime work with weak/cheap models because the hard work is
+  # converted into small evidence packets and strict JSON decisions.
+
   - model_name: consultant-model
     litellm_params:
-      model: anthropic/claude-3-5-sonnet-latest
-      api_key: os.environ/ANTHROPIC_API_KEY
-
-  - model_name: orchestrator-model
-    litellm_params:
-      model: anthropic/claude-3-5-sonnet-latest
-      api_key: os.environ/ANTHROPIC_API_KEY
-
-  - model_name: coding-model
-    litellm_params:
-      model: anthropic/claude-3-5-sonnet-latest
-      api_key: os.environ/ANTHROPIC_API_KEY
-
-  - model_name: research-model
-    litellm_params:
-      model: anthropic/claude-3-5-sonnet-latest
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: os.environ/PROMETHEUS_CONSULTANT_PROVIDER_MODEL
+      api_key: os.environ/PROMETHEUS_CONSULTANT_API_KEY
 
   - model_name: review-model
     litellm_params:
-      model: anthropic/claude-3-5-sonnet-latest
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: os.environ/PROMETHEUS_REVIEW_PROVIDER_MODEL
+      api_key: os.environ/PROMETHEUS_REVIEW_API_KEY
 
   - model_name: utility-model
     litellm_params:
-      model: anthropic/claude-3-haiku-20240307
+      model: os.environ/PROMETHEUS_UTILITY_PROVIDER_MODEL
+      api_key: os.environ/PROMETHEUS_UTILITY_API_KEY
+
+  # Optional ready-made examples. Keep these as aliases, not hard requirements.
+  - model_name: groq-small-consultant
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: groq-large-consultant
+    litellm_params:
+      model: groq/llama-3.1-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: openai-small-consultant
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: anthropic-consultant
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-latest
       api_key: os.environ/ANTHROPIC_API_KEY
 
 litellm_settings:
-  # Claude-only fallback chain. No OpenAI, Gemini, or Groq fallback in this profile.
   fallbacks:
-    - {"consultant-model": ["orchestrator-model", "utility-model"]}
-    - {"orchestrator-model": ["utility-model"]}
-    - {"coding-model": ["consultant-model", "utility-model"]}
-    - {"research-model": ["consultant-model", "utility-model"]}
-    - {"review-model": ["consultant-model", "utility-model"]}
+    - {"consultant-model": ["review-model", "utility-model", "groq-small-consultant"]}
+    - {"review-model": ["utility-model", "groq-small-consultant"]}
+    - {"utility-model": ["groq-small-consultant"]}
 
   drop_params: true
   set_verbose: false
