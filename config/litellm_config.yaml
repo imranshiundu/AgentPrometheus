@@ -1,58 +1,56 @@
 model_list:
-  # --- HIGH REASONING MODELS (ORCHESTRATION & QA) ---
+  # Claude-only model aliases for Consultant Mode.
+  # The system performs deterministic scanning, queueing, testing, and file handling.
+  # Claude is used as the consultant: planner, reviewer, risk analyst, and final critic.
+  - model_name: consultant-model
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+
   - model_name: orchestrator-model
     litellm_params:
       model: anthropic/claude-3-5-sonnet-latest
       api_key: os.environ/ANTHROPIC_API_KEY
-  - model_name: orchestrator-model-fallback
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/REAL_API_KEY
 
-  # --- CODING MODELS (OPENHANDS / SPECIALIST) ---
   - model_name: coding-model
     litellm_params:
       model: anthropic/claude-3-5-sonnet-latest
       api_key: os.environ/ANTHROPIC_API_KEY
-  - model_name: coding-model-fallback
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/REAL_API_KEY
 
-  # --- RESEARCH MODELS (AUTOGPT / SCOUT) ---
   - model_name: research-model
     litellm_params:
-      model: google/gemini-1.5-pro# Changed to 1.5 Pro for massive context support
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: research-model-fallback
-    litellm_params:
-      model: openai/gpt-3.5-turbo # Cheap & fast fallback
-      api_key: os.environ/REAL_API_KEY
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
 
-  # --- UTILITY MODELS (SCAFFOLDING / LOGS) ---
+  - model_name: review-model
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+
   - model_name: utility-model
     litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/REAL_API_KEY
+      model: anthropic/claude-3-haiku-20240307
+      api_key: os.environ/ANTHROPIC_API_KEY
 
 litellm_settings:
-  # Fallback Logic: Automatic Hot-Swapping if an API provider fails or rate-limits
-  fallbacks: 
-    - {"orchestrator-model": ["orchestrator-model-fallback"]}
-    - {"coding-model": ["coding-model-fallback"]}
-    - {"research-model": ["research-model-fallback"]}
-  
-  # The Universal Translator: Standardize all formats across providers
+  # Claude-only fallback chain. No OpenAI, Gemini, or Groq fallback in this profile.
+  fallbacks:
+    - {"consultant-model": ["orchestrator-model", "utility-model"]}
+    - {"orchestrator-model": ["utility-model"]}
+    - {"coding-model": ["consultant-model", "utility-model"]}
+    - {"research-model": ["consultant-model", "utility-model"]}
+    - {"review-model": ["consultant-model", "utility-model"]}
+
   drop_params: true
   set_verbose: false
+  num_retries: 2
+  request_timeout: 120
 
-  # Performance & Savings
   cache: true
   cache_params:
     type: redis
     host: os.environ/REDIS_HOST
     port: 6379
 
-  # Safe Boundaries
-  max_budget: 10.00
-  success_callback: ["langfuse"]
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
