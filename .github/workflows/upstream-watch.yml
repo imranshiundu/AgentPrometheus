@@ -1,0 +1,40 @@
+name: Upstream Watch
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  watch-upstreams:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run upstream watcher
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/upstream_watch.py
+
+      - name: Create pull request when reports change
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/upstream-watch-report
+          title: "chore: update upstream agent watch reports"
+          commit-message: "chore: update upstream agent watch reports"
+          body: |
+            Automated upstream watch report.
+
+            This PR does not copy upstream source code. It only records changed upstream commits so maintainers can review whether Agent Prometheus should adopt any design lessons.
+          add-paths: |
+            docs/upstream_reports/**
