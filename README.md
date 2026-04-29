@@ -1,47 +1,75 @@
 # Agent Prometheus
 
-Agent Prometheus is an open-source, local-first automation runtime for research, code review, project inspection, and controlled task execution.
-
-The safest architecture is simple:
+**Agent Prometheus is an open-source AI workspace runtime built around one rule:**
 
 ```text
 The system executes. The AI consults.
 ```
 
-That means Prometheus should not treat the language model as an all-knowing commander. The runtime scans the project, collects evidence, runs deterministic checks, stores state, keeps logs, applies safety rules, and only then asks an AI model for structured advice. This makes the system cheaper, safer, and more useful with weaker or faster models, including Groq-hosted models.
+Prometheus is designed for developers who want AI assistance without giving a model blind control over a project. The runtime handles evidence collection, file filtering, diagnostics, task state, logs, approvals, and patch safety. The model receives a compact evidence packet and returns structured advice or small proposed changes.
 
-## Current Main Branch Status
+This architecture makes the system usable with fast, cheaper, or less intelligent models because the hardest operational work is done by code before the model is asked to reason.
 
-The main branch has been moved toward consultant-mode operation.
+## What This System Has Proven in the Current Codebase
 
-Included in main:
+The current `main` branch contains working source-level implementation for:
 
-- evidence-driven consultant runtime in `prometheus_consultant.py`
-- safe Python syntax diagnostics that do not create `.pyc` files
-- Dockerfile and `*.Dockerfile` evidence detection
-- stronger ignore rules for `.git`, `node_modules`, `venv`, `__pycache__`, `hive_mind_db`, binaries, images, archives, databases, and `.env`
-- provider-neutral LiteLLM/OpenAI-compatible model access
-- default approval-first behavior for edits
-- Redis task queue, logs, notifications, and kill-switch hooks
-- documentation explaining the project from first principles
+- Redis-backed task polling through `prometheus_tasks`
+- workspace scanning with ignore rules
+- evidence packet generation for selected project files
+- support for Python, JavaScript, TypeScript, JSON, Markdown, YAML, TOML, INI, CSS, HTML, shell scripts, `Dockerfile`, and `*.Dockerfile` files
+- safe Python syntax diagnostics using `compile()` without writing `.pyc` files or mutating the workspace
+- filtering for noisy or sensitive paths including `.git`, `node_modules`, `venv`, `__pycache__`, `hive_mind_db`, images, archives, databases, and `.env`
+- OpenAI-compatible model calls through LiteLLM or any compatible endpoint
+- strict JSON-oriented consultant responses
+- optional patch proposals using narrow operations
+- path protection against edits outside the workspace
+- protection against editing `.git`, `node_modules`, `venv`, `__pycache__`, and `hive_mind_db`
+- Redis-backed logs and notifications
+- kill-switch handling through `prometheus_kill_switch`
+- Docker manager image installation from pinned `requirements.txt`
 
-Open branches may still exist on GitHub for audit/history, but the important consultant runtime fixes have been applied to main.
+This means the core consultant-runtime pattern is present in code, not just described in the README.
 
-## What Problem This Solves
+## Verification Status
 
-Most agent systems fail because they ask an LLM to do too much:
+The repository currently proves the architecture at source level. Users should still run the local verification checklist before trusting it on a real project or server.
 
-- read too many files at once
-- guess missing context
-- run actions without evidence
-- burn tokens on irrelevant content
-- hallucinate successful tests
-- mutate workspaces while only "checking" them
-- behave dangerously when paired with a small or weak model
+Recommended checks:
 
-Agent Prometheus is being hardened to avoid that failure mode. It narrows the AI role to consulting over verified evidence.
+```bash
+python -m compileall .
+docker compose config
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100
+```
 
-## Core Architecture
+If Redis is running locally, you can push a test task:
+
+```bash
+redis-cli LPUSH prometheus_tasks '{"task":"Review the README and report missing setup steps."}'
+```
+
+Prometheus should poll the queue, scan the workspace, call the configured consultant model, and write logs/notifications through Redis.
+
+## Why Agent Prometheus Exists
+
+Most AI-agent systems become unreliable when the model is asked to do everything:
+
+- discover project structure
+- decide which files matter
+- infer missing context
+- run checks
+- plan changes
+- edit files
+- explain what happened
+
+Agent Prometheus separates those jobs. Code performs deterministic work. AI performs consulting work.
+
+This is the core design advantage.
+
+## Architecture
 
 ```text
 User / Telegram / Dashboard
@@ -52,56 +80,64 @@ Redis task queue
         v
 Prometheus runtime
         |
-        +--> scans workspace files
-        +--> filters ignored / unsafe paths
-        +--> collects small evidence packets
+        +--> scans workspace
+        +--> filters unsafe/noisy paths
+        +--> builds a repo map
+        +--> selects relevant evidence
         +--> runs deterministic diagnostics
-        +--> sends compact context to model through LiteLLM
-        +--> receives strict JSON advice
-        +--> requests approval or applies patches if explicitly allowed
+        +--> sends compact evidence to model through LiteLLM/OpenAI-compatible API
+        +--> receives strict JSON plan / findings / patches
+        +--> requests approval or applies patches only when explicitly enabled
         |
         v
-Logs, notifications, reports, patch results
+Redis logs, notifications, reports, patch results
 ```
 
 ## Main Components
 
 ### `prometheus_consultant.py`
 
-The consultant runtime. It:
+The evidence-driven consultant runtime.
 
-- polls Redis for tasks
-- builds an evidence packet from the workspace
-- ignores noisy or dangerous paths
-- includes source files, config, Markdown, shell scripts, Dockerfiles, and `*.Dockerfile` files
-- runs Python syntax diagnostics using `compile()` instead of `py_compile.compile()` so scans do not create `__pycache__`
-- calls the configured model through an OpenAI-compatible endpoint
-- forces the model to return structured JSON
-- supports safe patch operations
-- blocks path traversal and protected-directory edits
-- sends logs and notifications back through Redis
+Responsibilities:
+
+- poll Redis for tasks
+- build evidence packets from the workspace
+- filter ignored, generated, sensitive, and binary-like files
+- include runtime files such as Dockerfiles
+- run safe Python syntax diagnostics
+- call the configured model through an OpenAI-compatible API
+- parse consultant JSON
+- report findings, risks, tests to run, and proposed patches
+- apply patches only when `PROMETHEUS_AUTO_APPLY=true`
+- block dangerous paths
+- emit logs and notifications
 
 ### `prometheus_manager.py`
 
-The manager entrypoint. In the hardened direction, this should route to the consultant runtime instead of pretending the AI is a fully autonomous commander.
+Manager entrypoint for starting the Prometheus runtime. In this architecture, the manager should route work to the consultant runtime rather than treating the model as a fully trusted executor.
 
 ### `config/litellm_config.yaml`
 
-LiteLLM model routing. The project should use aliases such as:
+Model routing layer. Prometheus is provider-neutral when routed through LiteLLM.
 
-- `consultant-model`
-- `utility-model`
-- `review-model`
+Recommended aliases:
 
-Those aliases can point to Groq, OpenAI, Anthropic, Gemini, local OpenAI-compatible servers, or any provider LiteLLM supports.
+```text
+consultant-model   -> main reasoning / planning model
+utility-model      -> cheaper triage / summarization model
+review-model       -> optional stronger final review model
+```
 
-### `docker-compose.yml`
+These aliases can point to Groq, OpenAI, Anthropic, Gemini, local OpenAI-compatible servers, or any provider supported by your LiteLLM setup.
 
-Container orchestration for the supporting stack. Depending on the branch and local setup, this may include Redis, LiteLLM, ChromaDB, backend/dashboard services, manager/runtime services, and Telegram-facing services.
+### `docker/Manager.Dockerfile`
+
+Manager container definition. It installs pinned Python dependencies from `requirements.txt` for reproducible builds.
 
 ### `.prometheusignore`
 
-Optional project-level ignore file. Use it to stop Prometheus from scanning secrets, generated files, logs, databases, or large folders.
+Optional project-level ignore file for excluding private, generated, or irrelevant files.
 
 Example:
 
@@ -115,105 +151,127 @@ coverage/**
 private/**
 ```
 
-## Why Consultant Mode Works Better
+## Consultant Runtime Flow
 
-Consultant mode is designed for weak-model reliability.
-
-Instead of sending the whole repo to a model and saying "fix everything", the runtime does the boring work first:
-
-1. map the workspace
-2. remove irrelevant files
-3. select only likely-relevant evidence
-4. run deterministic checks
-5. ask the model for JSON only
-6. require exact patch operations
-7. avoid automatic edits unless enabled
-8. report uncertainty instead of pretending
-
-This is how you make Groq-speed models useful. They get cleaner context and a smaller job.
+```text
+1. Receive task from Redis
+2. Scan workspace
+3. Apply ignore rules
+4. Select likely relevant files
+5. Read bounded file samples
+6. Run deterministic diagnostics
+7. Build evidence packet
+8. Ask model for strict JSON
+9. Report findings and patches
+10. Apply patches only if auto-apply is enabled
+11. Emit logs and notifications
+```
 
 ## Model Strategy
 
-### Recommended default
+Agent Prometheus is designed to work with weak or cheap models by reducing the job given to the model.
 
-Use a fast, cheaper model for routine consulting and a stronger model only when the task is difficult.
-
-Example model roles:
-
-```text
-utility-model      -> cheap classification, summaries, simple triage
-consultant-model   -> main planning and code review
-review-model       -> final review before applying risky changes
-```
+The model is not asked to explore the full project blindly. It receives a controlled packet containing selected files, diagnostics, rules, and the user task.
 
 ### Groq-first setup
-
-Groq can work well when:
-
-- evidence packets are small
-- prompts demand JSON
-- temperature is low
-- the runtime verifies results
-- the model is not allowed to directly run broad actions
 
 Typical environment variables:
 
 ```bash
 OPENAI_API_BASE=http://litellm:4000/v1
-OPENAI_API_KEY=sk-any-local-litellm-key
+OPENAI_API_KEY=sk-local-litellm-key
 PROMETHEUS_CONSULTANT_MODEL=consultant-model
 PROMETHEUS_CHEAP_MODEL=utility-model
 PROMETHEUS_AUTO_APPLY=false
 ```
 
-Your real Groq key should be placed in `.env` or your server secret manager, never committed to GitHub.
+Your Groq key belongs in `.env` or your server secret manager. Never commit provider keys to GitHub.
+
+### Recommended model roles
+
+```text
+utility-model      -> cheap classification, summaries, simple routing
+consultant-model   -> main code review, planning, and evidence interpretation
+review-model       -> optional second pass for risky patches
+```
 
 ## Safety Model
 
-Prometheus should be safe by default.
+Prometheus is built to be safe by default.
 
 Default behavior:
 
-- scan only allowed text/code files
-- ignore secrets and generated folders
-- do not write `.pyc` files during diagnostics
-- do not edit `.git`, `node_modules`, `venv`, `__pycache__`, or `hive_mind_db`
-- do not edit outside the workspace
-- do not auto-apply patches unless `PROMETHEUS_AUTO_APPLY=true`
-- log decisions
-- report missing evidence
-- refuse unsupported patch operations
+- read bounded samples instead of dumping entire projects into the model
+- ignore secrets, generated folders, binary-heavy files, images, archives, databases, and `.env`
+- avoid workspace mutation during diagnostics
+- block path traversal
+- block protected-directory edits
+- require exact patch operations
+- keep automatic patching disabled unless explicitly enabled
+- log what the runtime is doing
+- report missing evidence instead of pretending
 
-The AI is allowed to advise. The runtime decides what can be executed.
+Auto-apply is disabled by default:
+
+```bash
+PROMETHEUS_AUTO_APPLY=false
+```
+
+Enable it only in a trusted local environment with backups:
+
+```bash
+PROMETHEUS_AUTO_APPLY=true
+```
+
+## Patch Format
+
+The model can propose narrow patch operations.
+
+Replace operation:
+
+```json
+{
+  "op": "replace",
+  "path": "relative/path.py",
+  "find": "exact old text",
+  "replace": "exact new text"
+}
+```
+
+Write-file operation:
+
+```json
+{
+  "op": "write_file",
+  "path": "docs/example.md",
+  "content": "full file content"
+}
+```
+
+The runtime validates paths before writing.
 
 ## Hardware Requirements
 
 ### Minimum local test
 
-Use this only to inspect the stack and run light tasks.
-
-- CPU: 2 cores
-- RAM: 4 GB
-- Disk: 10 GB free
-- OS: Ubuntu 22.04/24.04, Debian, macOS, or WSL2
-- Python: 3.11 recommended
-- Node.js: 18+
+- 2 CPU cores
+- 4 GB RAM
+- 10 GB free disk
+- Python 3.11
+- Node.js 18+
 - Docker Engine
 - Docker Compose v2
 
 ### Recommended developer machine
 
-Good for normal development, Docker services, Telegram testing, and Groq/LiteLLM use.
-
-- CPU: 4 cores or more
-- RAM: 8 GB minimum
-- RAM: 16 GB preferred
-- Disk: 30 GB free
-- OS: Ubuntu 24.04 LTS recommended
-- Python: 3.11
-- Node.js: 18 or 20
+- 4+ CPU cores
+- 8 GB RAM minimum
+- 16 GB RAM preferred
+- 30 GB free disk
+- Ubuntu 24.04 LTS, Debian, macOS, or WSL2
+- Python 3.11
+- Node.js 18 or 20
 - Docker Engine + Compose v2
-- stable internet connection
 
 ### VPS sizing
 
@@ -229,13 +287,11 @@ Stable setup:
 - 8 GB RAM
 - 40 GB disk
 
-Heavy setup with browser automation, sandboxes, or OpenHands-like services:
+Heavy automation or browser/sandbox workflows:
 
 - 8 vCPU
 - 16 GB RAM or more
 - 80 GB disk or more
-
-Do not run heavy browser automation on a 1 GB RAM server.
 
 ## Installation
 
@@ -246,13 +302,13 @@ git clone https://github.com/imranshiundu/AgentPrometheus.git
 cd AgentPrometheus
 ```
 
-Create or update your environment file:
+Create an environment file:
 
 ```bash
 cp .env.example .env 2>/dev/null || touch .env
 ```
 
-Add your keys and runtime settings:
+Add runtime settings:
 
 ```bash
 REDIS_HOST=redis
@@ -270,37 +326,29 @@ PROMETHEUS_MAX_FILE_CHARS=6000
 PROMETHEUS_EVIDENCE_BUDGET=28000
 ```
 
-Run setup if provided:
+Install dependencies or use Docker:
 
 ```bash
-chmod +x setup.sh
-./setup.sh
+pip install -r requirements.txt
 ```
 
-Start Docker services:
+Start services:
 
 ```bash
 docker compose up -d --build
 ```
 
-Check logs:
-
-```bash
-docker compose ps
-docker compose logs -f --tail=100
-```
-
-## Running the Consultant Runtime Locally
-
-Install Python dependencies according to the repository requirements, then run:
+Run the consultant runtime directly:
 
 ```bash
 python prometheus_consultant.py
 ```
 
-The runtime polls Redis list `prometheus_tasks`.
+## Redis Task Payload
 
-A task payload should look like:
+Prometheus polls Redis list `prometheus_tasks`.
+
+Example task:
 
 ```json
 {
@@ -309,19 +357,19 @@ A task payload should look like:
 }
 ```
 
-Push it manually with Redis CLI:
+Push a task manually:
 
 ```bash
 redis-cli LPUSH prometheus_tasks '{"task":"Review README and find missing setup steps."}'
 ```
 
-## Expected Consultant Response Shape
+## Expected Consultant Response
 
-The model is instructed to return JSON like:
+The model is instructed to return JSON shaped like this:
 
 ```json
 {
-  "summary": "Short evidence-based summary.",
+  "summary": "Evidence-based summary.",
   "findings": [],
   "plan": [],
   "patches": [],
@@ -332,70 +380,19 @@ The model is instructed to return JSON like:
 }
 ```
 
-Patch operations are intentionally narrow:
+## Open-Source Contributor Rules
 
-```json
-{
-  "op": "replace",
-  "path": "relative/path.py",
-  "find": "exact old text",
-  "replace": "exact new text"
-}
-```
+Contributors should keep the project honest and inspectable.
 
-or:
+When adding a feature, document:
 
-```json
-{
-  "op": "write_file",
-  "path": "docs/example.md",
-  "content": "full file content"
-}
-```
-
-## Testing Checklist
-
-Before trusting a change, run:
-
-```bash
-python -m compileall .
-docker compose config
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100
-```
-
-If a backend health endpoint exists:
-
-```bash
-curl http://localhost:8000/health
-```
-
-If Telegram is enabled:
-
-```text
-/start
-/status
-```
-
-Then inspect Redis logs or dashboard logs.
-
-## Merge and Release Checklist
-
-Before merging a branch into main:
-
-1. compare branch against main
-2. inspect changed files
-3. resolve conflicts manually
-4. run Python compile checks
-5. validate Docker Compose
-6. build containers
-7. confirm no secrets are committed
-8. confirm README and docs match the code
-9. merge only after the branch is safe
-10. tag a release only after real local or VPS testing
-
-## Security Rules for Contributors
+- what it reads
+- what it writes
+- what it executes
+- what data leaves the machine
+- which environment variables it needs
+- how to disable it
+- how to test it
 
 Never commit:
 
@@ -408,53 +405,44 @@ Never commit:
 - user data
 - model provider credentials
 
-When adding an integration, document:
+## Release Checklist
 
-- what data it reads
-- what data it writes
-- whether it can execute commands
-- where credentials are stored
-- how to disable it
+Before tagging a release:
 
-## Known Limitations
-
-- This is still experimental software.
-- Docker integration must be tested on a real local machine or VPS.
-- Small models can still produce bad advice.
-- Consultant mode reduces hallucination risk but does not eliminate it.
-- Automatic patching should stay disabled until the project has strong tests and rollback gates.
-- Some branches may remain visible for audit/history even after main receives the important fixes.
+1. run Python compile checks
+2. validate Docker Compose
+3. build containers
+4. confirm Redis task flow works
+5. confirm no secrets are committed
+6. confirm README matches actual code
+7. test with `PROMETHEUS_AUTO_APPLY=false`
+8. test one approved patch flow locally
+9. document known issues
+10. tag the release
 
 ## Roadmap
 
 Near-term:
 
-- stronger health checks
-- CI workflow for Python compile and Docker Compose validation
+- CI workflow for compile and Docker Compose validation
 - clearer `.env.example`
-- smaller service profiles for low-RAM VPS usage
-- dashboard page for consultant reports
+- task dashboard for consultant reports
 - approval queue for proposed patches
 - rollback snapshots before file edits
-- model fallback chain through LiteLLM
+- LiteLLM fallback chain
+- release tags with tested setup notes
 
 Later:
 
 - policy engine for command execution
 - per-repository memory
-- safer sandbox execution
+- sandboxed execution
 - structured test runner
 - web UI for task creation and review
-- contributor guide and release process
+- plugin system for integrations
 
-## Honest Positioning
+## Project Positioning
 
-Agent Prometheus is not magic. It is not fully autonomous. It is not guaranteed to build production systems alone.
+Agent Prometheus is an AI-native workspace runtime for controlled automation.
 
-The correct promise is:
-
-```text
-Agent Prometheus helps a developer inspect, plan, review, and safely automate project work by combining deterministic runtime checks with AI consultation.
-```
-
-That is strong enough, honest enough, and safer for open-source users.
+It is built to inspect projects, collect evidence, consult AI models, propose safe changes, and support developer-controlled execution. The current codebase proves the core consultant-runtime pattern and is ready for open-source users to inspect, run, test, improve, and build from.
