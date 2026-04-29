@@ -42,21 +42,31 @@ The current `main` branch contains working source-level implementation for:
 - Docker manager image installation from pinned `requirements.txt`
 - upstream watcher for AutoGPT, OpenHands, CrewAI, and GPT Engineer design changes
 - scheduled GitHub Action that can open a report PR when watched upstream repositories change
+- CI workflow for Python compile checks, dependency installation, Docker Compose config validation, and quick secret hygiene scanning
+- safe `.env.example` for Groq/LiteLLM/Redis setup without committed secrets
+- verification guide at `docs/VERIFICATION.md`
 
 This means the core consultant-runtime pattern is present in code, not just described in the README.
 
 ## Verification Status
 
-The repository currently proves the architecture at source level. Users should still run the local verification checklist before trusting it on a real project or server.
+The repository now includes a CI workflow at `.github/workflows/ci.yml`. GitHub will run checks on pushes and pull requests targeting `main`.
 
-Recommended checks:
+Recommended local checks:
 
 ```bash
 python -m compileall .
+python -m py_compile tools/upstream_watch.py
 docker compose config
 docker compose up -d --build
 docker compose ps
 docker compose logs --tail=100
+```
+
+Full verification instructions are documented in:
+
+```text
+docs/VERIFICATION.md
 ```
 
 If Redis is running locally, you can push a test task:
@@ -144,13 +154,30 @@ Watched projects:
 - `crewAIInc/crewAI`
 - `gpt-engineer-org/gpt-engineer`
 
+### `.github/workflows/ci.yml`
+
+CI workflow that verifies source and configuration on push and PR:
+
+- installs Python dependencies
+- compiles Python files
+- validates Docker Compose config when present
+- runs a quick committed-secret scan
+
 ### `.github/workflows/upstream-watch.yml`
 
 Scheduled GitHub Action that runs the upstream watcher and opens a PR if new upstream reports are generated.
 
+### `.env.example`
+
+Safe environment template for Redis, LiteLLM, Groq, model aliases, Telegram, and service ports. Copy it to `.env` locally and fill in real secrets outside Git.
+
 ### `docs/UPSTREAM_FEATURE_MAP.md`
 
 Design map explaining how Prometheus should learn from AutoGPT, OpenHands, CrewAI, and GPT Engineer without becoming a copy of any of them.
+
+### `docs/VERIFICATION.md`
+
+Step-by-step local verification guide.
 
 ### `config/litellm_config.yaml`
 
@@ -209,6 +236,12 @@ Agent Prometheus is designed to work with weak or cheap models by reducing the j
 The model is not asked to explore the full project blindly. It receives a controlled packet containing selected files, diagnostics, rules, and the user task.
 
 ### Groq-first setup
+
+Copy the environment template:
+
+```bash
+cp .env.example .env
+```
 
 Typical environment variables:
 
@@ -365,26 +398,10 @@ cd AgentPrometheus
 Create an environment file:
 
 ```bash
-cp .env.example .env 2>/dev/null || touch .env
+cp .env.example .env
 ```
 
-Add runtime settings:
-
-```bash
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-OPENAI_API_BASE=http://litellm:4000/v1
-OPENAI_API_KEY=sk-local-litellm-key
-
-PROMETHEUS_CONSULTANT_MODEL=consultant-model
-PROMETHEUS_CHEAP_MODEL=utility-model
-PROMETHEUS_WORKSPACE=workspace
-PROMETHEUS_AUTO_APPLY=false
-PROMETHEUS_MAX_FILES=120
-PROMETHEUS_MAX_FILE_CHARS=6000
-PROMETHEUS_EVIDENCE_BUDGET=28000
-```
+Fill in your local provider keys and runtime settings in `.env`.
 
 Install dependencies or use Docker:
 
@@ -484,16 +501,14 @@ Before tagging a release:
 
 Near-term:
 
-- CI workflow for compile and Docker Compose validation
-- clearer `.env.example`
-- task dashboard for consultant reports
 - approval queue for proposed patches
 - rollback snapshots before file edits
 - LiteLLM fallback chain
 - release tags with tested setup notes
 - workflow block schema
 - flow runner
-- upstream update reports
+- task dashboard for consultant reports
+- benchmark suite
 
 Later:
 
@@ -504,7 +519,6 @@ Later:
 - web UI for task creation and review
 - plugin system for integrations
 - Agent Protocol adapter
-- benchmark suite
 - multi-role Prometheus crews
 
 ## Project Positioning
