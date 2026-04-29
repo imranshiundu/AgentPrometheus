@@ -1,71 +1,116 @@
-# Agent Prometheus 🔱
+# Agent Prometheus
 
-![Agent Prometheus Logo](logo.png)
+Agent Prometheus is an evidence-driven automation runtime that uses AI as a consultant, not as imaginary hands.
 
-**The Titan-Class AI Orchestrator & Self-Improving Hive Mind.**
+The system performs the work: scanning folders, selecting files, running deterministic checks, collecting logs, queueing tasks, applying approved patches, and producing reports. The AI model is consulted for judgement: diagnosis, planning, review, risk analysis, and patch suggestions.
 
-Agent Prometheus is a high-performance Meta-Framework that unifies the world's most specialized AI agents—**AutoGPT, OpenHands, crewAI, and gpt-engineer**—into a single, uncrashable entity.
+This architecture is designed to work even with cheap or weak models because the runtime sends small evidence packets instead of asking the model to understand the whole project at once.
 
-> [!IMPORTANT]
-> **Marketing Note:** If OpenClaw is a high-speed motorcycle, **Agent Prometheus is a diesel-powered freight train.** It is exponentially heavier, more secure, and built for heavy-duty engineering rather than personal assistance.
+## Core idea
 
----
+```text
+The system executes. The AI consults.
+```
 
-## 🔱 The Prometheus Core
-Prometheus is not just a chatbot; it is an autonomous thinking engine designed to **Build, Research, and Innovate**.
+Agent Prometheus avoids the fragile “multi-agent fantasy” pattern where models pretend they tested code or inspected files. A model must only reason from evidence the runtime gives it.
 
-### 🧠 Self-Improving Hive Mind
-Using a persistent **ChromaDB Vector Brain**, Prometheus learns from every mistake. If it finds a fix for a technical hurdle on Monday, it applies that knowledge automatically to your next project on Friday.
+## What the runtime does
 
-### 📱 Remote Command (Telegram)
-Command your local workforce from your phone. Receive **Interactive Approval Gates**, approve **SPEC.md** documents with a tap, and get final deliverables (Scripts, Data, Reports) sent directly to your chat.
+- scans the workspace
+- builds a repo map
+- reads relevant text files safely
+- ignores secrets, binaries, dependency folders, and build artifacts
+- runs Python compile checks
+- creates compact evidence packets
+- asks a provider-neutral model through LiteLLM
+- accepts strict JSON consultant plans
+- proposes or applies small patch operations
+- reports results to Redis, backend, dashboard, and Telegram front desk
 
-### 🛡 The Uncrashable Keychain 
-Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes tasks to the best model (Claude for Code, Gemini for Data, GPT-4o for Management). If one provider goes down, the system **hot-swaps** to a fallback instantly.
+## What the AI does
 
----
+- interprets evidence
+- identifies likely causes
+- proposes minimal patches
+- lists tests to run
+- warns about risk
+- requests missing evidence instead of guessing
 
-## 🏗 System Abilities
-- **End-to-End Prototyping:** From a single prompt to a functional, debugged repo.
-- **Autonomous Intelligence Gathering:** Web research, documentation scraping, and CSV delivery.
-- **Spec-Driven Development:** Enforces a rigid **SSoT (Single Source of Truth)** via a Spec Guardian QA agent.
-- **Zero-Token Selective Memory:** Decouples memory from context windows for near-infinite project recall.
+## Weak-model friendly design
 
----
+Cheap models fail when they are given vague instructions and a giant codebase. Agent Prometheus reduces the task into structured evidence and strict JSON.
 
-## 🚀 Quick Start
+Default mode is safe:
 
-1. **Clone & Setup:**
-   ```bash
-   git clone https://github.com/imranshiundu/AgentPrometheus.git
-   cd AgentPrometheus
-   ./setup.sh
-   ```
-2. **Configure:** Update the `.env` file with your API keys.
-3. **Launch:**
-   ```bash
-   docker-compose up -d
-   python telegram_gateway.py
-   ```
+```env
+PROMETHEUS_AUTO_APPLY=false
+```
 
----
+That means the model can suggest changes, but Prometheus will not write files unless auto-apply is enabled or approval logic is added by the operator.
 
-## 📖 Project Documentation
-- [Usage Guide](USAGE_GUIDE.md) - **Recommended for beginners. How to command the bot.**
-- [Installation Guide](INSTALL.md) - **Step-by-step setup for Linux, Mac, and WSL2.**
-- [System Architecture](SYSTEM_ARCHITECTURE.md) - **Triage, Hot-Swaps, and M2M Protocols.**
-- [Agent Abilities](AGENT_ABILITIES.md) - **Master Capabilities & OpenClaw Comparison.**
-- [Hardware Specs](HARDWARE_SPECS.md) - **VPS Requirements & Device Compatibility.**
-- [Honest Abilities](HONEST_ABILITIES.md) - **Wait, what *can't* it do? (Reality check).**
-- [API Orchestration](API_ORCHESTRATION.md) - **Configuring the LiteLLM Key Chain.**
-- [Development Log](PROMETHEUS_LOG.md) - **Chronicle of the Titan's Forge.**
+## Quick start
 
----
+```bash
+git clone https://github.com/imranshiundu/AgentPrometheus.git
+cd AgentPrometheus
+./setup.sh
+docker compose up -d
+curl http://localhost:8000/health
+```
 
-## 🚀 Deployment
-1. Set up your `.env` with OpenAI, Anthropic, or Gemini keys.
-2. Run `docker-compose up -d`.
-3. Launch `python telegram_gateway.py` to start the Front Desk.
+Then open:
 
----
-**Forged for those who don't just want an assistant, but a machine that builds.**
+```text
+Dashboard: http://localhost:5173
+Backend:   http://localhost:8000
+LiteLLM:   http://localhost:4000
+ChromaDB:  http://localhost:8001
+```
+
+## Model setup
+
+Agent Prometheus is provider-neutral. Use any LiteLLM-supported provider.
+
+Cheap Groq profile:
+
+```env
+PROMETHEUS_CONSULTANT_PROVIDER_MODEL=groq/llama-3.1-8b-instant
+PROMETHEUS_REVIEW_PROVIDER_MODEL=groq/llama-3.1-8b-instant
+PROMETHEUS_UTILITY_PROVIDER_MODEL=groq/llama-3.1-8b-instant
+GROQ_API_KEY=your_key_here
+PROMETHEUS_CONSULTANT_API_KEY=your_key_here
+PROMETHEUS_REVIEW_API_KEY=your_key_here
+PROMETHEUS_UTILITY_API_KEY=your_key_here
+```
+
+Balanced profile:
+
+```env
+PROMETHEUS_CONSULTANT_PROVIDER_MODEL=groq/llama-3.1-70b-versatile
+PROMETHEUS_REVIEW_PROVIDER_MODEL=groq/llama-3.1-70b-versatile
+PROMETHEUS_UTILITY_PROVIDER_MODEL=groq/llama-3.1-8b-instant
+```
+
+Premium profile:
+
+```env
+PROMETHEUS_CONSULTANT_PROVIDER_MODEL=anthropic/claude-3-5-sonnet-latest
+PROMETHEUS_REVIEW_PROVIDER_MODEL=anthropic/claude-3-5-sonnet-latest
+PROMETHEUS_UTILITY_PROVIDER_MODEL=anthropic/claude-3-haiku-20240307
+```
+
+## Documentation
+
+- [Consultant Mode](CONSULTANT_MODE.md)
+- [Usage Guide](USAGE_GUIDE.md)
+- [Installation Guide](INSTALL.md)
+- [System Architecture](SYSTEM_ARCHITECTURE.md)
+- [Agent Abilities](AGENT_ABILITIES.md)
+- [Hardware Specs](HARDWARE_SPECS.md)
+- [Honest Abilities](HONEST_ABILITIES.md)
+- [API Orchestration](API_ORCHESTRATION.md)
+- [Development Log](PROMETHEUS_LOG.md)
+
+## Current reality
+
+Agent Prometheus is an open-source automation runtime under active hardening. It should be treated as a serious local/VPS tool, not a magical autonomous employee. The safest production path is evidence collection, human approval, then patch application.
