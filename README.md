@@ -10,6 +10,18 @@ Prometheus is designed for developers who want AI assistance without giving a mo
 
 This architecture makes the system usable with fast, cheaper, or less intelligent models because the hardest operational work is done by code before the model is asked to reason.
 
+## What Agent Prometheus Is Building Toward
+
+Agent Prometheus is intended to combine the best proven ideas from major open-source agent systems while keeping a safer Prometheus core:
+
+- AutoGPT-style continuous workflows and reusable automation blocks
+- OpenHands-style developer workspace control, file operations, terminal supervision, and sandbox discipline
+- CrewAI-style roles, tasks, crews, flows, and structured orchestration
+- GPT Engineer-style spec-to-code planning, project scaffolding, clarification loops, and verification cycles
+- Prometheus-style evidence packets, weak-model reliability, Redis state, safety gates, patch review, and open-source inspectability
+
+Prometheus should not become a blind autonomous fantasy system. It should become a serious runtime that can research, plan, propose, patch, test, document, and report through controlled execution.
+
 ## What This System Has Proven in the Current Codebase
 
 The current `main` branch contains working source-level implementation for:
@@ -28,6 +40,8 @@ The current `main` branch contains working source-level implementation for:
 - Redis-backed logs and notifications
 - kill-switch handling through `prometheus_kill_switch`
 - Docker manager image installation from pinned `requirements.txt`
+- upstream watcher for AutoGPT, OpenHands, CrewAI, and GPT Engineer design changes
+- scheduled GitHub Action that can open a report PR when watched upstream repositories change
 
 This means the core consultant-runtime pattern is present in code, not just described in the README.
 
@@ -117,6 +131,27 @@ Responsibilities:
 
 Manager entrypoint for starting the Prometheus runtime. In this architecture, the manager should route work to the consultant runtime rather than treating the model as a fully trusted executor.
 
+### `tools/upstream_watch.py`
+
+Safe upstream repository watcher.
+
+It checks selected public repositories and writes local Markdown reports when their default branch changes. It does not copy source code from upstream projects.
+
+Watched projects:
+
+- `Significant-Gravitas/AutoGPT`
+- `All-Hands-AI/OpenHands`
+- `crewAIInc/crewAI`
+- `gpt-engineer-org/gpt-engineer`
+
+### `.github/workflows/upstream-watch.yml`
+
+Scheduled GitHub Action that runs the upstream watcher and opens a PR if new upstream reports are generated.
+
+### `docs/UPSTREAM_FEATURE_MAP.md`
+
+Design map explaining how Prometheus should learn from AutoGPT, OpenHands, CrewAI, and GPT Engineer without becoming a copy of any of them.
+
 ### `config/litellm_config.yaml`
 
 Model routing layer. Prometheus is provider-neutral when routed through LiteLLM.
@@ -195,6 +230,30 @@ consultant-model   -> main code review, planning, and evidence interpretation
 review-model       -> optional second pass for risky patches
 ```
 
+## Upstream Update Strategy
+
+Prometheus can watch upstream repositories, but it must not automatically copy code.
+
+Safe update loop:
+
+```text
+1. Watch upstream repo metadata
+2. Detect latest commit changes
+3. Write a local update report
+4. Open a PR for maintainers
+5. Human reviews what changed
+6. Prometheus implements only selected ideas in original code
+7. Tests and docs are updated before merge
+```
+
+Run manually:
+
+```bash
+python tools/upstream_watch.py
+```
+
+The scheduled GitHub Action can run weekly and open a pull request with new reports.
+
 ## Safety Model
 
 Prometheus is built to be safe by default.
@@ -210,6 +269,7 @@ Default behavior:
 - keep automatic patching disabled unless explicitly enabled
 - log what the runtime is doing
 - report missing evidence instead of pretending
+- watch upstream projects without copying their code
 
 Auto-apply is disabled by default:
 
@@ -431,6 +491,9 @@ Near-term:
 - rollback snapshots before file edits
 - LiteLLM fallback chain
 - release tags with tested setup notes
+- workflow block schema
+- flow runner
+- upstream update reports
 
 Later:
 
@@ -440,6 +503,9 @@ Later:
 - structured test runner
 - web UI for task creation and review
 - plugin system for integrations
+- Agent Protocol adapter
+- benchmark suite
+- multi-role Prometheus crews
 
 ## Project Positioning
 
