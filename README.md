@@ -1,62 +1,112 @@
-# Agent Prometheus 🔱
+# Agent Prometheus
 
-![Agent Prometheus Logo](logo.png)
+Agent Prometheus is an experimental open-source multi-agent automation system.
 
-**The Titan-Class AI Orchestrator & Self-Improving Hive Mind.**
+The safer direction for this project is consultant-mode automation:
 
-Agent Prometheus is a high-performance Meta-Framework that unifies the world's most specialized AI agents—**AutoGPT, OpenHands, crewAI, and gpt-engineer**—into a single, uncrashable entity.
+The system executes. The AI consults.
 
-> [!IMPORTANT]
-> **Marketing Note:** If OpenClaw is a high-speed motorcycle, **Agent Prometheus is a diesel-powered freight train.** It is exponentially heavier, more secure, and built for heavy-duty engineering rather than personal assistance.
+This means Prometheus should scan files, collect evidence, queue tasks, run checks, keep logs, and ask an LLM for structured advice. The LLM should not be treated as an all-knowing commander. This makes the system safer and cheaper, especially when using small or fast models such as Groq-hosted models.
 
----
+## Current Status
 
-## 🔱 The Prometheus Core
-Prometheus is not just a chatbot; it is an autonomous thinking engine designed to **Build, Research, and Innovate**.
+This repository is under active hardening. The main branch still contains the original multi-agent framework structure, while newer consultant-mode work is being tested in branches and pull requests.
 
-### 🧠 Self-Improving Hive Mind
-Using a persistent **ChromaDB Vector Brain**, Prometheus learns from every mistake. If it finds a fix for a technical hurdle on Monday, it applies that knowledge automatically to your next project on Friday.
+Branches currently visible:
 
-### 📱 Remote Command (Telegram)
-Command your local workforce from your phone. Receive **Interactive Approval Gates**, approve **SPEC.md** documents with a tap, and get final deliverables (Scripts, Data, Reports) sent directly to your chat.
+- main
+- consultant-runtime-groq-clean
+- prometheus-hardening-runtime-upgrade
+- consultant-runtime-final-safe
 
-### 🛡 The Uncrashable Keychain 
-Powered by a **Tiered Mult-API Switchboard**, Prometheus dynamically routes tasks to the best model (Claude for Code, Gemini for Data, GPT-4o for Management). If one provider goes down, the system **hot-swaps** to a fallback instantly.
+Do not blindly merge branches without testing. The safe path is to test one branch at a time, confirm Docker boots, then merge.
 
----
+## What Prometheus Is Supposed To Do
 
-## 🏗 System Abilities
-- **End-to-End Prototyping:** From a single prompt to a functional, debugged repo.
-- **Autonomous Intelligence Gathering:** Web research, documentation scraping, and CSV delivery.
-- **Spec-Driven Development:** Enforces a rigid **SSoT (Single Source of Truth)** via a Spec Guardian QA agent.
-- **Zero-Token Selective Memory:** Decouples memory from context windows for near-infinite project recall.
+Prometheus is intended to receive tasks through Telegram or a dashboard, store task state in Redis, keep project memory in ChromaDB, route model calls through LiteLLM, use provider-neutral model aliases, send small evidence packets to the model, request approval before risky edits, and support Groq or other OpenAI-compatible providers through LiteLLM.
 
----
+## Recommended Architecture
 
-### 🛠 Launch Sequence
-1. **Forge the Titan:** `chmod +x setup.sh && ./setup.sh`
-2. **Ignite the Pulse:** `docker-compose up -d`
-3. **Open the Gates:** `python telegram_gateway.py`
-4. **Awaken the Brain:** `python prometheus_manager.py` (Run in a separate shell)
+Telegram or dashboard sends a task to Redis. The Prometheus runtime collects evidence, runs safety checks, sends a small packet to a LiteLLM model alias, receives structured consultant advice, then the runtime decides what to do next.
 
-*Once running, go to Telegram and send `/start`.*
+The model should be used for summarising evidence, planning, reviewing code, identifying risks, proposing patches, and explaining failures.
 
----
+The runtime should handle file scanning, logs, execution, command running, approvals, tests, saving outputs, and rollback rules.
 
-## 📖 Project Documentation
-- [Usage Guide](USAGE_GUIDE.md) - **Recommended for beginners. How to command the bot.**
-- [Remote Control](REMOTE_CONTROL.md) - **Eyes and Hands. How to pair your local laptop.**
-- [Installation Guide](INSTALL.md) - **Step-by-step setup for Linux, Mac, and WSL2.**
-- [System Architecture](SYSTEM_ARCHITECTURE.md) - **Triage, Hot-Swaps, and M2M Protocols.**
-- [Agent Abilities](AGENT_ABILITIES.md) - **Master Capabilities & OpenClaw Comparison.**
-- [Hardware Specs](HARDWARE_SPECS.md) - **VPS Requirements & Device Compatibility.**
-- [Honest Abilities](HONEST_ABILITIES.md) - **Wait, what *can't* it do? (Reality check).**
-- [API Orchestration](API_ORCHESTRATION.md) - **Configuring the LiteLLM Key Chain.**
-- [Development Log](PROMETHEUS_LOG.md) - **Chronicle of the Titan's Forge.**
+## Minimum Requirements
 
----
+For a small local test:
 
+- CPU: 2 cores
+- RAM: 4 GB minimum
+- Disk: 10 GB free
+- OS: Ubuntu 22.04/24.04, Debian, macOS, or WSL2
+- Python: 3.11 recommended
+- Node.js: 18+
+- Docker: latest stable
+- Docker Compose: v2 recommended
 
+This can boot the light parts of the stack, but it may struggle if OpenHands or heavy browser automation is enabled.
 
----
-**Forged for those who don't just want an assistant, but a machine that builds.**
+## Recommended Requirements
+
+For a usable developer setup:
+
+- CPU: 4 cores or more
+- RAM: 8 GB minimum, 16 GB better
+- Disk: 30 GB free
+- OS: Ubuntu 24.04 LTS recommended
+- Python: 3.11
+- Node.js: 18 or 20
+- Docker Engine and Docker Compose v2
+- Stable internet connection
+
+For a VPS, use 2 vCPU and 4 GB RAM for a basic Telegram, Redis, and LiteLLM setup. Use 4 vCPU and 8 GB RAM for a stable always-on setup. Use 8 vCPU and 16 GB RAM if running heavier sandboxes, browser automation, or OpenHands-like services.
+
+## API Requirements
+
+At least one model provider key is required. For the Groq-first direction, add a Groq API key in the environment and point LiteLLM model aliases to Groq models.
+
+Optional providers include OpenAI, Anthropic, Gemini, or any provider supported by LiteLLM.
+
+Telegram is optional, but needed for remote command mode.
+
+## Install
+
+Run setup.sh, then edit .env and add your real keys.
+
+## Run
+
+Use Docker Compose to build and start the system. Then check running containers and logs.
+
+## Safety Defaults
+
+Prometheus should keep automatic file editing disabled by default. This means the model may propose changes, but the runtime should not blindly apply them. This is especially important when using small models. Weak models can be useful when they receive small, clean evidence packets, but they should not be trusted with full autonomous control.
+
+## Testing Checklist Before Merging Branches
+
+Before merging any hardening branch into main, run Python compile checks, validate Docker Compose, build the containers, inspect container status, and review recent logs. If the backend exposes a health endpoint, test it locally. If using Telegram, send /start and confirm that messages are received.
+
+## Known Limitations
+
+- The project is still experimental.
+- Some branches are ahead of main and need careful review before merging.
+- Full Docker integration testing must be done on a real machine or VPS.
+- AI providers may return inconsistent output unless prompts are strict and evidence packets are small.
+- Automatic code editing should remain disabled until the runtime has strong test and rollback gates.
+
+## Repository Documents
+
+- Usage Guide: USAGE_GUIDE.md
+- Remote Control: REMOTE_CONTROL.md
+- Installation Guide: INSTALL.md
+- System Architecture: SYSTEM_ARCHITECTURE.md
+- Agent Abilities: AGENT_ABILITIES.md
+- Hardware Specs: HARDWARE_SPECS.md
+- Honest Abilities: HONEST_ABILITIES.md
+- API Orchestration: API_ORCHESTRATION.md
+- Development Log: PROMETHEUS_LOG.md
+
+## Development Rule
+
+Do not market Prometheus as uncrashable or fully autonomous until the tests prove it. The project should be honest: it is a local-first automation runtime that uses AI as a consultant layer.
