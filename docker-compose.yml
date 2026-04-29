@@ -1,65 +1,84 @@
-version: '3.8'
-
 services:
-  # 1. Central API Gateway
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
+    command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000"]
+    env_file: .env
     volumes:
-      - ./config/litellm_config.yaml:/app/config.yaml
+      - ./config/litellm_config.yaml:/app/config.yaml:ro
     ports:
       - "4000:4000"
-    environment:
-      - REAL_API_KEY=${REAL_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
     networks:
-      - prometheus-public
-      - prometheus-internal
+      - prometheus-net
+    restart: unless-stopped
 
-  # 2. Redis Nervous System
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
     networks:
-      - prometheus-internal
+      - prometheus-net
+    restart: unless-stopped
 
-  # 3. The CEO / Orchestrator (Securely Isolated)
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes:
+      - ./workspace/hive_mind_db:/chroma/chroma
+    ports:
+      - "8001:8000"
+    networks:
+      - prometheus-net
+    restart: unless-stopped
+
   prometheus-manager:
-    build: 
+    build:
       context: ./
       dockerfile: docker/Manager.Dockerfile
+    command: ["python", "prometheus_manager.py"]
+    env_file: .env
     volumes:
       - ./workspace:/app/workspace
-      - ./prometheus_manager.py:/app/prometheus_manager.py
-      - ./memory_ledger.py:/app/memory_ledger.py
-      - ./.prometheusignore:/app/.prometheusignore
+      - ./prometheus_manager.py:/app/prometheus_manager.py:ro
+      - ./prometheus_consultant.py:/app/prometheus_consultant.py:ro
+      - ./memory_ledger.py:/app/memory_ledger.py:ro
+      - ./.prometheusignore:/app/.prometheusignore:ro
     environment:
       - OPENAI_API_BASE=http://litellm:4000/v1
-      - OPENAI_API_KEY=sk-prometheus-dummy-internal-key
       - REDIS_HOST=redis
+      - CHROMA_HOST=chromadb
     depends_on:
       - litellm
       - redis
+      - chromadb
     networks:
-      - prometheus-internal
+      - prometheus-net
+    restart: unless-stopped
 
-  # 4. Web Dashboard (Frontend)
-  dashboard:
-    image: node:18-alpine
-    working_dir: /app
+  prometheus-frontdesk:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["python", "telegram_gateway.py"]
+    env_file: .env
     volumes:
-      - ./dashboard:/app
-    ports:
-      - "5173:5173"
-    command: ["npm", "run", "dev", "--", "--host"]
+      - ./workspace:/app/workspace
+      - ./telegram_gateway.py:/app/telegram_gateway.py:ro
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
     networks:
-      - prometheus-public
+      - prometheus-net
+    restart: unless-stopped
 
-  # 5. Dashboard Backend
   backend:
     build:
       context: ./
       dockerfile: docker/Manager.Dockerfile
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: .env
     volumes:
       - ./backend:/app
       - ./workspace:/app/workspace
@@ -70,12 +89,26 @@ services:
     depends_on:
       - redis
     networks:
-      - prometheus-public
-      - prometheus-internal
+      - prometheus-net
+    restart: unless-stopped
+
+  dashboard:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./dashboard:/app
+    ports:
+      - "5173:5173"
+    command: ["sh", "-lc", "test -d node_modules || npm install; npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      - backend
+    networks:
+      - prometheus-net
+    restart: unless-stopped
 
 networks:
-  prometheus-internal:
+  prometheus-net:
     driver: bridge
-    internal: true # EXTREME SECURITY: Block manager from all internet access.
-  prometheus-public:
-    driver: bridge # Standard bridge for UI and API connectivity.
+
+volumes:
+  redis-data:
