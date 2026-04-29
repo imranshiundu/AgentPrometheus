@@ -4,7 +4,6 @@ import asyncio
 import fnmatch
 import json
 import os
-import py_compile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +23,10 @@ DEFAULT_IGNORE = [
 TEXT_EXTENSIONS = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".md", ".txt",
     ".yml", ".yaml", ".toml", ".ini", ".css", ".html", ".sh",
+    ".dockerfile",
 }
+
+SPECIAL_TEXT_FILENAMES = {"Dockerfile", "Makefile"}
 
 
 @dataclass
@@ -75,7 +77,8 @@ def ignored(rel_path: str, patterns: Iterable[str]) -> bool:
 
 
 def is_text_file(path: Path) -> bool:
-    return path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}
+    suffix = path.suffix.lower()
+    return suffix in TEXT_EXTENSIONS or path.name in SPECIAL_TEXT_FILENAMES
 
 
 def safe_rel(workspace: Path, path: Path) -> Optional[str]:
@@ -113,13 +116,15 @@ def score_file(task: str, rel: str, sample: str) -> int:
 
 
 def compile_checks(files: List[Path], workspace: Path) -> List[Dict[str, str]]:
+    """Run Python syntax diagnostics without writing .pyc files to the workspace."""
     errors: List[Dict[str, str]] = []
     for path in files:
         if path.suffix != ".py":
             continue
         rel = safe_rel(workspace, path) or str(path)
         try:
-            py_compile.compile(str(path), doraise=True)
+            source = path.read_text(encoding="utf-8", errors="ignore")
+            compile(source, rel, "exec")
         except Exception as exc:
             errors.append({"file": rel, "error": str(exc)})
     return errors
