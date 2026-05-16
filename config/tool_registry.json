@@ -1,0 +1,10 @@
+{
+  "tools": [
+    {
+      "name": "autogpt",
+      "label": "AutoGPT",
+      "status": "planned",
+      "notes": "Prometheus will expose this as a callable tool through backend routes after the bridge adapter is added."
+    }
+  ]
+}
