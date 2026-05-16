@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # 1. Central model gateway
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     volumes:
@@ -19,13 +18,11 @@ services:
     networks:
       - prometheus-net
 
-  # 2. Redis event bus, task queue, logs, and notifications
   redis:
     image: redis:alpine
     networks:
       - prometheus-net
 
-  # 3. Persistent memory store
   chromadb:
     image: chromadb/chroma:latest
     volumes:
@@ -35,7 +32,6 @@ services:
     networks:
       - prometheus-net
 
-  # 4. Optional external coding sandbox
   openhands:
     image: docker.all-hands.dev/all-hands-ai/openhands:main
     environment:
@@ -51,7 +47,6 @@ services:
     networks:
       - prometheus-net
 
-  # 5. Unified runtime: evidence scan -> deterministic checks -> consultant plan -> guarded patches
   prometheus-orchestrator:
     build:
       context: ./
@@ -64,6 +59,7 @@ services:
       - ./prometheus_json.py:/app/prometheus_json.py
       - ./.prometheusignore:/app/.prometheusignore
     environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
       - OPENAI_API_BASE=http://litellm:4000/v1
       - OPENAI_API_KEY=sk-prometheus-dummy
       - PROMETHEUS_CONSULTANT_MODEL=consultant-model
@@ -78,7 +74,6 @@ services:
     networks:
       - prometheus-net
 
-  # 6. Telegram gateway
   prometheus-frontdesk:
     build:
       context: ./
@@ -88,6 +83,7 @@ services:
       - ./workspace:/app/workspace
       - ./telegram_gateway.py:/app/telegram_gateway.py
     environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - REDIS_HOST=redis
@@ -97,7 +93,6 @@ services:
     networks:
       - prometheus-net
 
-  # 7. Web dashboard frontend
   dashboard:
     image: node:18-alpine
     working_dir: /app
@@ -106,6 +101,7 @@ services:
     ports:
       - "5173:5173"
     environment:
+      - VITE_APP_NAME=${APP_NAME:-Workspace Runtime}
       - VITE_API_BASE=http://localhost:8000
       - VITE_WS_BASE=ws://localhost:8000
     command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
@@ -114,7 +110,6 @@ services:
     networks:
       - prometheus-net
 
-  # 8. Dashboard/API backend
   backend:
     build:
       context: ./
@@ -128,13 +123,13 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
       - REDIS_HOST=redis
     depends_on:
       - redis
     networks:
       - prometheus-net
 
-  # 9. Remote vision and hands bridge
   vision-bridge:
     build:
       context: ./
@@ -146,6 +141,7 @@ services:
       - "8765:8765"
     command: ["python", "vps_receiver.py"]
     environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
       - REDIS_HOST=redis
     depends_on:
       - redis
