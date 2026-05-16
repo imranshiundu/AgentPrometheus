@@ -17,6 +17,8 @@ TASK_QUEUE = os.getenv("PROMETHEUS_TASK_QUEUE", "prometheus_tasks")
 LOG_STREAM = os.getenv("PROMETHEUS_LOG_STREAM", "prometheus_logs")
 NOTIFICATION_CHANNEL = os.getenv("PROMETHEUS_NOTIFICATION_CHANNEL", "prometheus_notifications")
 KILL_SWITCH_KEY = os.getenv("PROMETHEUS_KILL_SWITCH_KEY", "prometheus_kill_switch")
+APPROVAL_INDEX = os.getenv("PROMETHEUS_APPROVAL_INDEX", "prometheus_approvals")
+APPROVAL_KEY_PREFIX = os.getenv("PROMETHEUS_APPROVAL_KEY_PREFIX", "prometheus_approval")
 CONSULTANT_MODEL = os.getenv("PROMETHEUS_CONSULTANT_MODEL", "consultant-model")
 CHEAP_MODEL = os.getenv("PROMETHEUS_CHEAP_MODEL", "utility-model")
 AUTO_APPLY = os.getenv("PROMETHEUS_AUTO_APPLY", "false").lower() == "true"
@@ -25,12 +27,7 @@ PRODUCTION_DIR = WORKSPACE / "production"
 
 app = FastAPI(title=f"{APP_NAME} Runtime API")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_connect_timeout=3, socket_timeout=3)
 
@@ -64,6 +61,13 @@ def redis_get(key: str, default: str | None = None) -> str | None:
         return default
 
 
+def redis_set_json(key: str, value: Any) -> None:
+    try:
+        r.set(key, json.dumps(value))
+    except redis.RedisError as exc:
+        raise HTTPException(status_code=503, detail=f"Redis unavailable: {exc}") from exc
+
+
 def redis_llen(key: str) -> int:
     try:
         return r.llen(key)
@@ -83,6 +87,30 @@ def redis_lpush(key: str, value: str) -> int:
         return r.lpush(key, value)
     except redis.RedisError as exc:
         raise HTTPException(status_code=503, detail=f"Redis unavailable: {exc}") from exc
+
+
+def approval_key(approval_id: str) -> str:
+    return f"{APPROVAL_KEY_PREFIX}:{approval_id}"
+
+
+def read_approval(approval_id: str) -> dict[str, Any]:
+    raw = redis_get(approval_key(approval_id))
+    if not raw:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    data = parse_json(raw, None)
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=500, detail="Approval record is corrupt")
+    return data
+
+
+def update_approval_status(approval_id: str, status: str) -> dict[str, Any]:
+    approval = read_approval(approval_id)
+    if approval.get("status") not in {"pending", "approved", "rejected"}:
+        raise HTTPException(status_code=409, detail=f"Approval is already {approval.get('status')}")
+    approval["status"] = status
+    approval["updated_at"] = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+    redis_set_json(approval_key(approval_id), approval)
+    return approval
 
 
 def safe_artifact_path(name: str) -> Path:
@@ -115,17 +143,7 @@ async def health():
 
 @app.get("/runtime/config")
 async def runtime_config():
-    return {
-        "app_name": APP_NAME,
-        "runtime": "consultant",
-        "consultant_model": CONSULTANT_MODEL,
-        "cheap_model": CHEAP_MODEL,
-        "auto_apply": AUTO_APPLY,
-        "workspace": str(WORKSPACE),
-        "task_queue": TASK_QUEUE,
-        "log_stream": LOG_STREAM,
-        "notification_channel": NOTIFICATION_CHANNEL,
-    }
+    return {"app_name": APP_NAME, "runtime": "consultant", "consultant_model": CONSULTANT_MODEL, "cheap_model": CHEAP_MODEL, "auto_apply": AUTO_APPLY, "workspace": str(WORKSPACE), "task_queue": TASK_QUEUE, "log_stream": LOG_STREAM, "notification_channel": NOTIFICATION_CHANNEL, "approval_index": APPROVAL_INDEX}
 
 
 @app.get("/runtime/routes")
@@ -150,17 +168,8 @@ async def get_vision_node():
 @app.get("/stats")
 async def get_stats():
     health = redis_health()
-    return {
-        "tokens": redis_get("prometheus_token_count", "0") or "0",
-        "health": health.upper(),
-        "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1",
-        "queue_depth": redis_llen(TASK_QUEUE),
-        "log_count": redis_llen(LOG_STREAM),
-        "notification_count": redis_llen(NOTIFICATION_CHANNEL),
-        "kill_switch": redis_get(KILL_SWITCH_KEY) == "true",
-        "runtime": "consultant",
-        "app_name": APP_NAME,
-    }
+    pending = [item for item in await list_approvals() if item.get("status") == "pending"]
+    return {"tokens": redis_get("prometheus_token_count", "0") or "0", "health": health.upper(), "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1", "queue_depth": redis_llen(TASK_QUEUE), "log_count": redis_llen(LOG_STREAM), "notification_count": redis_llen(NOTIFICATION_CHANNEL), "pending_approval_count": len(pending), "kill_switch": redis_get(KILL_SWITCH_KEY) == "true", "runtime": "consultant", "app_name": APP_NAME}
 
 
 @app.get("/logs")
@@ -182,6 +191,29 @@ async def get_notifications(limit: int = 50):
     limit = max(1, min(limit, 200))
     notifications = redis_lrange(NOTIFICATION_CHANNEL, 0, limit - 1)
     return [parse_json(item, {"text": item}) for item in notifications]
+
+
+@app.get("/approvals")
+async def list_approvals(limit: int = 50):
+    limit = max(1, min(limit, 100))
+    ids = redis_lrange(APPROVAL_INDEX, 0, limit - 1)
+    approvals: list[dict[str, Any]] = []
+    for approval_id in ids:
+        raw = redis_get(approval_key(approval_id))
+        parsed = parse_json(raw, None)
+        if isinstance(parsed, dict):
+            approvals.append(parsed)
+    return approvals
+
+
+@app.post("/approvals/{approval_id}/approve")
+async def approve(approval_id: str):
+    return update_approval_status(approval_id, "approved")
+
+
+@app.post("/approvals/{approval_id}/reject")
+async def reject(approval_id: str):
+    return update_approval_status(approval_id, "rejected")
 
 
 @app.websocket("/ws/logs")
