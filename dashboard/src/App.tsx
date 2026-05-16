@@ -13,6 +13,7 @@ import {
 import { motion } from 'framer-motion';
 
 type Section = 'command' | 'memory' | 'artifacts' | 'reports' | 'settings';
+type FeatureMode = 'off' | 'auto' | 'on';
 
 type RuntimeLog = { id?: number | string; type?: string; time?: string; msg?: string };
 type RuntimeStats = {
@@ -23,6 +24,7 @@ type RuntimeStats = {
   log_count?: number;
   notification_count?: number;
   pending_approval_count?: number;
+  active_feature_count?: number;
   kill_switch?: boolean;
   runtime?: string;
   app_name?: string;
@@ -37,10 +39,12 @@ type RuntimeConfig = {
   task_queue?: string;
   log_stream?: string;
   notification_channel?: string;
+  feature_modes?: FeatureMode[];
 };
 type RuntimeFile = { name: string; size?: number; modified?: number };
 type RuntimeRoute = { path: string; methods: string[] };
 type Approval = { id: string; status: string; task?: string; patches?: unknown[]; created_at?: string; updated_at?: string };
+type RuntimeFeature = { name: string; label: string; description: string; ram: string; mode: FeatureMode; state: string; requested: boolean; request_reason?: string; active: boolean };
 
 const configuredApiBase = import.meta.env.VITE_API_BASE;
 const configuredWsBase = import.meta.env.VITE_WS_BASE;
@@ -68,6 +72,7 @@ const Dashboard = () => {
   const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [routes, setRoutes] = useState<RuntimeRoute[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [features, setFeatures] = useState<RuntimeFeature[]>([]);
 
   const appName = config.app_name || statsData.app_name || FALLBACK_APP_NAME;
 
@@ -84,7 +89,7 @@ const Dashboard = () => {
   };
 
   const refreshRuntime = async () => {
-    const [stats, runtimeConfig, artifactList, reportList, queueList, notificationList, routeList, approvalList] = await Promise.all([
+    const [stats, runtimeConfig, artifactList, reportList, queueList, notificationList, routeList, approvalList, featureList] = await Promise.all([
       loadJson<RuntimeStats>('/stats', {}),
       loadJson<RuntimeConfig>('/runtime/config', {}),
       loadJson<RuntimeFile[]>('/artifacts', []),
@@ -93,6 +98,7 @@ const Dashboard = () => {
       loadJson<Record<string, unknown>[]>('/notifications', []),
       loadJson<RuntimeRoute[]>('/runtime/routes', []),
       loadJson<Approval[]>('/approvals', []),
+      loadJson<RuntimeFeature[]>('/features', []),
     ]);
     setStatsData(stats);
     setConfig(runtimeConfig);
@@ -102,6 +108,7 @@ const Dashboard = () => {
     setNotifications(notificationList);
     setRoutes(routeList);
     setApprovals(approvalList);
+    setFeatures(featureList);
   };
 
   useEffect(() => {
@@ -138,8 +145,9 @@ const Dashboard = () => {
       { label: 'System Health', value: statsData.health || apiStatus.toUpperCase(), icon: <Shield size={20} /> },
       { label: 'Active Runtime', value: statsData.runtime || config.runtime || 'consultant', icon: <Cpu size={20} /> },
       { label: 'Queue Depth', value: String(statsData.queue_depth ?? queue.length), icon: <Activity size={20} /> },
+      { label: 'Active Features', value: String(statsData.active_feature_count ?? features.filter((item) => item.active).length), icon: <Settings size={20} /> },
     ],
-    [apiStatus, config.runtime, queue.length, statsData]
+    [apiStatus, config.runtime, features, queue.length, statsData]
   );
 
   const submitTask = async (event: React.FormEvent) => {
@@ -164,6 +172,20 @@ const Dashboard = () => {
 
   const decideApproval = async (id: string, decision: 'approve' | 'reject') => {
     await fetch(`${API_BASE}/approvals/${id}/${decision}`, { method: 'POST' });
+    await refreshRuntime();
+  };
+
+  const setFeatureMode = async (name: string, mode: FeatureMode) => {
+    await fetch(`${API_BASE}/features/${name}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    await refreshRuntime();
+  };
+
+  const clearFeatureRequest = async (name: string) => {
+    await fetch(`${API_BASE}/features/${name}/request`, { method: 'DELETE' });
     await refreshRuntime();
   };
 
@@ -199,6 +221,25 @@ const Dashboard = () => {
     </div>
   );
 
+  const renderFeatures = () => (
+    <div className="console-box">
+      <div className="box-header"><span>Heavy Feature Controls</span><span>{features.filter((item) => item.active).length} active</span></div>
+      <div className="log-stream">
+        {features.length === 0 ? <div className="log-entry system">No feature controls loaded.</div> : features.map((feature) => (
+          <div key={feature.name} className="log-entry system" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: '0.55rem' }}>
+            <span><strong>{feature.label}</strong> — {feature.active ? 'active' : 'idle'} / {feature.ram}</span>
+            <span>{feature.description}</span>
+            {feature.requested && <span>Auto request: {feature.request_reason || 'requested by runtime'}</span>}
+            <span style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {(['off', 'auto', 'on'] as FeatureMode[]).map((mode) => <button key={mode} onClick={() => setFeatureMode(feature.name, mode)} style={{ opacity: feature.mode === mode ? 1 : 0.55 }}>{mode.toUpperCase()}</button>)}
+              {feature.requested && <button onClick={() => clearFeatureRequest(feature.name)}>Clear Auto Request</button>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderSection = () => {
     if (section === 'artifacts') {
       return <div className="console-box"><div className="box-header"><span>Artifact Registry</span></div><div className="log-stream">{artifacts.length === 0 ? <div className="log-entry system">No artifacts found.</div> : artifacts.map((file) => <div key={file.name} className="log-entry system"><a href={`${API_BASE}/artifacts/${file.name}`} target="_blank" rel="noreferrer">{file.name}</a><span>{bytes(file.size)}</span></div>)}</div></div>;
@@ -207,10 +248,10 @@ const Dashboard = () => {
       return <div className="console-box"><div className="box-header"><span>Evidence Reports</span></div><div className="log-stream">{reports.length === 0 ? <div className="log-entry system">No reports found.</div> : reports.map((file) => <div key={file.name} className="log-entry system"><a href={`${API_BASE}/artifacts/${file.name}`} target="_blank" rel="noreferrer">{file.name}</a><span>{bytes(file.size)}</span></div>)}</div></div>;
     }
     if (section === 'memory') {
-      return <div className="console-section"><div className="console-box"><div className="box-header"><span>Queued Work</span></div>{renderList(queue, 'No queued tasks.')}</div><div className="console-box"><div className="box-header"><span>Notifications</span></div>{renderList(notifications, 'No notifications.')}</div></div>;
+      return <div className="console-section">{renderFeatures()}<div className="console-box"><div className="box-header"><span>Queued Work</span></div>{renderList(queue, 'No queued tasks.')}</div><div className="console-box"><div className="box-header"><span>Notifications</span></div>{renderList(notifications, 'No notifications.')}</div></div>;
     }
     if (section === 'settings') {
-      return <div className="console-section">{renderApprovals()}<div className="console-box"><div className="box-header"><span>Runtime Config</span><button onClick={toggleKillSwitch}>{statsData.kill_switch ? 'Clear Kill Switch' : 'Trigger Kill Switch'}</button></div><div className="log-stream"><div className="log-entry system"><span>{JSON.stringify(config, null, 2)}</span></div></div></div><div className="console-box"><div className="box-header"><span>Connected API Routes</span></div><div className="log-stream">{routes.map((route) => <div key={route.path} className="log-entry system"><span>{route.methods.join(', ') || 'WS'}</span><span>{route.path}</span></div>)}</div></div></div>;
+      return <div className="console-section">{renderApprovals()}{renderFeatures()}<div className="console-box"><div className="box-header"><span>Runtime Config</span><button onClick={toggleKillSwitch}>{statsData.kill_switch ? 'Clear Kill Switch' : 'Trigger Kill Switch'}</button></div><div className="log-stream"><div className="log-entry system"><span>{JSON.stringify(config, null, 2)}</span></div></div></div><div className="console-box"><div className="box-header"><span>Connected API Routes</span></div><div className="log-stream">{routes.map((route) => <div key={route.path} className="log-entry system"><span>{route.methods.join(', ') || 'WS'}</span><span>{route.path}</span></div>)}</div></div></div>;
     }
     return <div className="console-section"><div className="console-box"><div className="box-header"><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Terminal size={16} /><span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Live Execution Stream</span></div></div><div className="log-stream">{logs.length === 0 ? <div className="log-entry system"><span>No runtime logs yet.</span></div> : logs.map((log, index) => <div key={`${log.time || 'log'}-${index}`} className={`log-entry ${log.type || 'system'}`}><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>[{log.time || '--:--:--'}]</span><span style={{ fontWeight: 600, minWidth: '90px', textTransform: 'uppercase', fontSize: '0.8rem' }}>{log.type || 'system'}:</span><span>{log.msg || JSON.stringify(log)}</span></div>)}</div></div><div className="agent-status-list"><h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Unified Runtime</h3><div className="agent-item"><div className="status-dot"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Evidence Scanner</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Collects files, routes, diagnostics, and repo index.</p></div></div><div className="agent-item"><div className="status-dot"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Consultant Runtime</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Asks the model for structured plans, not blind execution.</p></div></div><div className="agent-item"><div className="status-dot idle"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Patch Gate</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Approval is required before file edits unless explicitly disabled.</p></div></div></div></div>;
   };

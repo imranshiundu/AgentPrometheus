@@ -16,6 +16,7 @@ from openai import OpenAI
 
 from prometheus_indexer import index_repository, summarize_index
 from prometheus_json import parse_consultant_json
+from runtime_features import infer_needed_features, list_features, request_feature
 
 DEFAULT_IGNORE = [
     ".git/**", "**/.git/**", "node_modules/**", "**/node_modules/**",
@@ -86,6 +87,18 @@ def notify(r: redis.Redis, text: str, chat_id: Optional[int] = None, approval_ga
     if approval_id:
         payload["approval_id"] = approval_id
     safe_redis("notification push", lambda: r.lpush("prometheus_notifications", json.dumps(payload)))
+
+
+def request_task_features(task: str, r: redis.Redis) -> list[dict[str, Any]]:
+    requested: list[dict[str, Any]] = []
+    for feature_name, reason in infer_needed_features(task):
+        feature = request_feature(r, feature_name, reason)
+        requested.append(feature)
+        if feature.get("active"):
+            dashboard_log(r, f"Feature active/requested: {feature_name} ({feature.get('mode')}) — {reason}", "features")
+        else:
+            dashboard_log(r, f"Feature blocked or off: {feature_name} ({feature.get('mode')}) — {reason}", "features")
+    return requested
 
 
 def load_ignore_patterns(workspace: Path) -> List[str]:
@@ -312,7 +325,7 @@ async def wait_for_approval(r: redis.Redis, approval_id: str, timeout_seconds: i
     return update_approval(r, approval, "expired")
 
 
-def render_report(task: str, plan: Dict[str, Any], diagnostics: Dict[str, Any], patch_results: Optional[List[Dict[str, Any]]] = None, approval: Optional[Dict[str, Any]] = None) -> str:
+def render_report(task: str, plan: Dict[str, Any], diagnostics: Dict[str, Any], patch_results: Optional[List[Dict[str, Any]]] = None, approval: Optional[Dict[str, Any]] = None, requested_features: Optional[list[dict[str, Any]]] = None) -> str:
     return json.dumps({
         "task": task,
         "summary": plan.get("summary"),
@@ -323,6 +336,7 @@ def render_report(task: str, plan: Dict[str, Any], diagnostics: Dict[str, Any], 
         "missing_evidence": plan.get("missing_evidence", []),
         "confidence": plan.get("confidence", "unknown"),
         "approval": approval,
+        "features": requested_features or [],
         "diagnostics": diagnostics,
         "patch_results": patch_results or [],
     }, indent=2, ensure_ascii=False)
@@ -338,8 +352,10 @@ def write_report(config: RuntimeConfig, task: str, report: str) -> Path:
 
 
 async def run_task(task: str, chat_id: Optional[int], config: RuntimeConfig, r: redis.Redis) -> str:
+    requested_features = request_task_features(task, r)
     dashboard_log(r, f"Evidence scan started: {task[:160]}", "scanner")
     packet = collect_evidence(task, config)
+    packet["runtime_features"] = list_features(r)
     dashboard_log(r, f"Evidence packet ready: {len(packet['selected_files'])} files selected", "scanner")
     plan = ask_consultant(packet, config)
     dashboard_log(r, "Consultant plan received", "consultant")
@@ -374,7 +390,7 @@ async def run_task(task: str, chat_id: Optional[int], config: RuntimeConfig, r: 
             dashboard_log(r, f"Patch application skipped: approval {approval.get('status')}", "approval")
             patch_results = [{"applied": False, "reason": f"approval {approval.get('status')}", "approval_id": approval.get("id")}]
 
-    report = render_report(task, plan, packet.get("diagnostics", {}), patch_results, approval)
+    report = render_report(task, plan, packet.get("diagnostics", {}), patch_results, approval, requested_features)
     report_path = write_report(config, task, report)
     dashboard_log(r, f"Report artifact written: {report_path.relative_to(config.workspace).as_posix()}", "artifact")
     notify(r, "Consultant run complete:\n\n```json\n" + report[:3500] + "\n```", chat_id=chat_id)
