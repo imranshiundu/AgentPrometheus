@@ -32,6 +32,12 @@ FEATURE_DEFINITIONS: Dict[str, Dict[str, str]] = {
         "description": "Optional paired local observation/context bridge.",
         "ram": "medium",
     },
+    "autogpt": {
+        "label": "AutoGPT Bridge",
+        "default_mode": os.getenv("PROMETHEUS_FEATURE_AUTOGPT", "auto"),
+        "description": "Optional AutoGPT tool bridge for planning, task breakdown, and external run handoff.",
+        "ram": "external/variable",
+    },
     "openhands": {
         "label": "OpenHands Sandbox",
         "default_mode": os.getenv("PROMETHEUS_FEATURE_OPENHANDS", "off"),
@@ -161,6 +167,7 @@ def infer_needed_features(task: str) -> list[tuple[str, str]]:
         ("router", ("claude", "gemini", "openrouter", "fallback model", "model route", "provider"), "task mentions model routing/provider selection"),
         ("vision", ("screen", "screenshot", "observe", "vision", "desktop", "camera"), "task asks for visual/local observation context"),
         ("telegram", ("telegram", "phone", "mobile", "notify me", "message me"), "task asks for Telegram/mobile notification"),
+        ("autogpt", ("autogpt", "auto-gpt", "auto gpt"), "task asks for AutoGPT tool bridge"),
         ("openhands", ("openhands", "sandbox", "browser automation", "run in sandbox"), "task asks for heavy sandbox automation"),
         ("deep_scan", ("scan all", "entire repo", "all files", "code by code", "deep scan", "everything"), "task asks for a broad/deep repository scan"),
         ("voice", ("voice", "audio", "transcribe", "voice note"), "task asks for voice transcription"),
