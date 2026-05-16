@@ -10,6 +10,8 @@ Prometheus is one unified runtime for controlled developer automation: task inta
 
 The public-facing system name is **Agent Prometheus**. References to outside projects such as AutoGPT, OpenHands, CrewAI, and GPT Engineer are treated as implementation inspiration or optional adapters, not as user-facing product identities.
 
+For the exact naming and cleanup policy, see [`docs/cleanup-map.md`](docs/cleanup-map.md).
+
 ## Current Unified Architecture
 
 ```text
