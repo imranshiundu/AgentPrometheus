@@ -56,6 +56,35 @@ def redis_health() -> str:
         return "offline"
 
 
+def redis_get(key: str, default: str | None = None) -> str | None:
+    try:
+        value = r.get(key)
+        return value if value is not None else default
+    except redis.RedisError:
+        return default
+
+
+def redis_llen(key: str) -> int:
+    try:
+        return r.llen(key)
+    except redis.RedisError:
+        return 0
+
+
+def redis_lrange(key: str, start: int, end: int) -> list[str]:
+    try:
+        return r.lrange(key, start, end)
+    except redis.RedisError:
+        return []
+
+
+def redis_lpush(key: str, value: str) -> int:
+    try:
+        return r.lpush(key, value)
+    except redis.RedisError as exc:
+        raise HTTPException(status_code=503, detail=f"Redis unavailable: {exc}") from exc
+
+
 def safe_artifact_path(name: str) -> Path:
     target = (PRODUCTION_DIR / name).resolve()
     root = PRODUCTION_DIR.resolve()
@@ -120,15 +149,15 @@ async def get_vision_node():
 
 @app.get("/stats")
 async def get_stats():
+    health = redis_health()
     return {
-        "tokens": r.get("prometheus_token_count") or "0",
-        "health": redis_health().upper(),
-        "active_agents": r.get("prometheus_active_count") or "1 / 1",
-        "queue_depth": r.llen(TASK_QUEUE),
-        "log_count": r.llen(LOG_STREAM),
-        "notification_count": r.llen(NOTIFICATION_CHANNEL),
-        "artifact_count": len(list_files(PRODUCTION_DIR)),
-        "kill_switch": r.get(KILL_SWITCH_KEY) == "true",
+        "tokens": redis_get("prometheus_token_count", "0") or "0",
+        "health": health.upper(),
+        "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1",
+        "queue_depth": redis_llen(TASK_QUEUE),
+        "log_count": redis_llen(LOG_STREAM),
+        "notification_count": redis_llen(NOTIFICATION_CHANNEL),
+        "kill_switch": redis_get(KILL_SWITCH_KEY) == "true",
         "runtime": "consultant",
         "app_name": APP_NAME,
     }
@@ -137,21 +166,21 @@ async def get_stats():
 @app.get("/logs")
 async def get_logs(limit: int = 100):
     limit = max(1, min(limit, 500))
-    logs = r.lrange(LOG_STREAM, 0, limit - 1)
+    logs = redis_lrange(LOG_STREAM, 0, limit - 1)
     return [parse_json(item, {"msg": item}) for item in logs]
 
 
 @app.get("/queue")
 async def get_queue(limit: int = 50):
     limit = max(1, min(limit, 200))
-    tasks = r.lrange(TASK_QUEUE, 0, limit - 1)
+    tasks = redis_lrange(TASK_QUEUE, 0, limit - 1)
     return [parse_json(item, {"task": item}) for item in tasks]
 
 
 @app.get("/notifications")
 async def get_notifications(limit: int = 50):
     limit = max(1, min(limit, 200))
-    notifications = r.lrange(NOTIFICATION_CHANNEL, 0, limit - 1)
+    notifications = redis_lrange(NOTIFICATION_CHANNEL, 0, limit - 1)
     return [parse_json(item, {"text": item}) for item in notifications]
 
 
@@ -160,7 +189,7 @@ async def websocket_logs(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            logs = r.lrange(LOG_STREAM, 0, 49)
+            logs = redis_lrange(LOG_STREAM, 0, 49)
             payload = [parse_json(item, {"msg": item}) for item in logs]
             await websocket.send_text(json.dumps(payload))
             await asyncio.sleep(2)
@@ -176,19 +205,25 @@ async def create_task(request: TaskRequest):
     payload: dict[str, Any] = {"task": task, "source": "dashboard", "status": "queued"}
     if request.chat_id is not None:
         payload["chat_id"] = request.chat_id
-    r.lpush(TASK_QUEUE, json.dumps(payload))
-    return {"queued": True, "queue_depth": r.llen(TASK_QUEUE)}
+    redis_lpush(TASK_QUEUE, json.dumps(payload))
+    return {"queued": True, "queue_depth": redis_llen(TASK_QUEUE)}
 
 
 @app.post("/control/kill-switch")
 async def trigger_kill_switch():
-    r.set(KILL_SWITCH_KEY, "true")
+    try:
+        r.set(KILL_SWITCH_KEY, "true")
+    except redis.RedisError as exc:
+        raise HTTPException(status_code=503, detail=f"Redis unavailable: {exc}") from exc
     return {"kill_switch": True}
 
 
 @app.delete("/control/kill-switch")
 async def clear_kill_switch():
-    r.delete(KILL_SWITCH_KEY)
+    try:
+        r.delete(KILL_SWITCH_KEY)
+    except redis.RedisError as exc:
+        raise HTTPException(status_code=503, detail=f"Redis unavailable: {exc}") from exc
     return {"kill_switch": False}
 
 
