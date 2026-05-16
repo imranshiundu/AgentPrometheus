@@ -34,6 +34,7 @@ PROTECTED_PATH_PARTS = {".git", "node_modules", "venv", "__pycache__", "hive_min
 
 @dataclass
 class RuntimeConfig:
+    app_name: str = os.getenv("APP_NAME", os.getenv("RUNTIME_APP_NAME", "Workspace Runtime"))
     redis_host: str = os.getenv("REDIS_HOST", "localhost")
     redis_port: int = int(os.getenv("REDIS_PORT", "6379"))
     workspace: Path = Path(os.getenv("PROMETHEUS_WORKSPACE", "workspace"))
@@ -132,7 +133,6 @@ def score_file(task: str, rel_path: str, text: str) -> int:
 
 
 def compile_python(paths: List[Path], workspace: Path) -> List[Dict[str, str]]:
-    """Run Python syntax diagnostics without writing .pyc files."""
     failures: List[Dict[str, str]] = []
     for path in paths:
         if path.suffix != ".py":
@@ -186,9 +186,9 @@ def extract_json(raw: str) -> Dict[str, Any]:
     return parse_consultant_json(raw)
 
 
-def consultant_system_prompt() -> str:
+def consultant_system_prompt(app_name: str) -> str:
     return (
-        "You are Agent Prometheus Consultant. You are not the executor. "
+        f"You are the consultant runtime for {app_name}. You are not the executor. "
         "The runtime has scanned files, indexed the repository, and run deterministic checks. "
         "Work even when the model is weak: use simple reasoning, short steps, and exact evidence. "
         "Return JSON only with keys: summary, findings, plan, patches, tests_to_run, risks, missing_evidence, confidence. "
@@ -204,7 +204,7 @@ def ask_consultant(packet: Dict[str, Any], config: RuntimeConfig, model: Optiona
         model=model or config.consultant_model,
         temperature=0.1,
         max_tokens=1800,
-        messages=[{"role": "system", "content": consultant_system_prompt()}, {"role": "user", "content": json.dumps(packet, ensure_ascii=False)}],
+        messages=[{"role": "system", "content": consultant_system_prompt(config.app_name)}, {"role": "user", "content": json.dumps(packet, ensure_ascii=False)}],
     )
     return extract_json(response.choices[0].message.content or "{}")
 
@@ -285,7 +285,7 @@ async def poll_for_tasks() -> None:
     config = RuntimeConfig()
     r = make_redis(config)
     config.workspace.mkdir(parents=True, exist_ok=True)
-    dashboard_log(r, "Agent Prometheus consultant runtime is polling for tasks", "system")
+    dashboard_log(r, f"{config.app_name} consultant runtime is polling for tasks", "system")
     while True:
         if r.get("prometheus_kill_switch") == "true":
             r.delete("prometheus_kill_switch")
