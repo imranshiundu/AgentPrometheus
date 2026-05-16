@@ -1,5 +1,15 @@
 model_list:
-  # --- HIGH REASONING MODELS (ORCHESTRATION & QA) ---
+  # --- UNIFIED PROMETHEUS CONSULTANT ---
+  - model_name: consultant-model
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-latest
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: consultant-model-fallback
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/REAL_API_KEY
+
+  # --- HIGH REASONING MODELS ---
   - model_name: orchestrator-model
     litellm_params:
       model: anthropic/claude-3-5-sonnet-latest
@@ -9,7 +19,7 @@ model_list:
       model: openai/gpt-4o
       api_key: os.environ/REAL_API_KEY
 
-  # --- CODING MODELS (OPENHANDS / SPECIALIST) ---
+  # --- CODING MODELS ---
   - model_name: coding-model
     litellm_params:
       model: anthropic/claude-3-5-sonnet-latest
@@ -19,40 +29,36 @@ model_list:
       model: openai/gpt-4o
       api_key: os.environ/REAL_API_KEY
 
-  # --- RESEARCH MODELS (AUTOGPT / SCOUT) ---
+  # --- RESEARCH MODELS ---
   - model_name: research-model
     litellm_params:
-      model: google/gemini-1.5-pro# Changed to 1.5 Pro for massive context support
+      model: google/gemini-1.5-pro
       api_key: os.environ/GEMINI_API_KEY
   - model_name: research-model-fallback
     litellm_params:
-      model: openai/gpt-3.5-turbo # Cheap & fast fallback
+      model: openai/gpt-3.5-turbo
       api_key: os.environ/REAL_API_KEY
 
-  # --- UTILITY MODELS (SCAFFOLDING / LOGS) ---
+  # --- UTILITY MODELS ---
   - model_name: utility-model
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/REAL_API_KEY
 
 litellm_settings:
-  # Fallback Logic: Automatic Hot-Swapping if an API provider fails or rate-limits
-  fallbacks: 
+  fallbacks:
+    - {"consultant-model": ["consultant-model-fallback"]}
     - {"orchestrator-model": ["orchestrator-model-fallback"]}
     - {"coding-model": ["coding-model-fallback"]}
     - {"research-model": ["research-model-fallback"]}
-  
-  # The Universal Translator: Standardize all formats across providers
+
   drop_params: true
   set_verbose: false
 
-  # Performance & Savings
   cache: true
   cache_params:
     type: redis
     host: os.environ/REDIS_HOST
     port: 6379
 
-  # Safe Boundaries
   max_budget: 10.00
-  success_callback: ["langfuse"]

@@ -39,6 +39,9 @@ jobs:
             prometheus_consultant.py \
             prometheus_indexer.py \
             prometheus_json.py \
+            backend/src/main.py \
+            telegram_gateway.py \
+            vps_receiver.py \
             tools/benchmark_consultant.py
 
       - name: Run consultant runtime tests
@@ -57,15 +60,10 @@ jobs:
           VPS_PUBLIC_IP: 127.0.0.1
           PWD: ${{ github.workspace }}
         run: |
-          if [ -f docker-compose.yml ]; then
-            docker compose config >/tmp/prometheus-compose.yml
-            echo "Docker Compose configuration is valid."
-          elif [ -f compose.yml ]; then
-            docker compose -f compose.yml config >/tmp/prometheus-compose.yml
-            echo "Docker Compose configuration is valid."
-          else
-            echo "No Docker Compose file found; skipping compose validation."
-          fi
+          docker compose config >/tmp/prometheus-compose.yml
+          grep -q 'prometheus_consultant.py' /tmp/prometheus-compose.yml
+          grep -q 'uvicorn' /tmp/prometheus-compose.yml
+          echo "Docker Compose configuration is valid and points to the unified runtime."
 
       - name: Secret hygiene quick scan
         run: |

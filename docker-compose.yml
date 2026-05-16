@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Central API Gateway (The Switchboard)
+  # 1. Central model gateway
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     volumes:
@@ -12,17 +12,20 @@ services:
       - REAL_API_KEY=${REAL_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_HOST=redis
       - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
     networks:
       - prometheus-net
 
-  # 2. Redis Nervous System (For Caching & Queues)
+  # 2. Redis event bus, task queue, logs, and notifications
   redis:
     image: redis:alpine
     networks:
       - prometheus-net
 
-  # 3. ChromaDB (The Hive Mind Experience Ledger)
+  # 3. Persistent memory store
   chromadb:
     image: chromadb/chroma:latest
     volumes:
@@ -32,7 +35,7 @@ services:
     networks:
       - prometheus-net
 
-  # 4. OpenHands (The Coding Specialist & Sandbox)
+  # 4. Optional external coding sandbox
   openhands:
     image: docker.all-hands.dev/all-hands-ai/openhands:main
     environment:
@@ -43,23 +46,29 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./workspace:/workspace
+    depends_on:
+      - litellm
     networks:
       - prometheus-net
 
-  # 5. The Orchestrator (The Brain)
+  # 5. Unified runtime: evidence scan -> deterministic checks -> consultant plan -> guarded patches
   prometheus-orchestrator:
-    build: 
+    build:
       context: ./
       dockerfile: docker/Manager.Dockerfile
-    command: ["python", "prometheus_manager.py"]
+    command: ["python", "prometheus_consultant.py"]
     volumes:
       - ./workspace:/app/workspace
-      - ./prometheus_manager.py:/app/prometheus_manager.py
-      - ./memory_ledger.py:/app/memory_ledger.py
+      - ./prometheus_consultant.py:/app/prometheus_consultant.py
+      - ./prometheus_indexer.py:/app/prometheus_indexer.py
+      - ./prometheus_json.py:/app/prometheus_json.py
       - ./.prometheusignore:/app/.prometheusignore
     environment:
       - OPENAI_API_BASE=http://litellm:4000/v1
       - OPENAI_API_KEY=sk-prometheus-dummy
+      - PROMETHEUS_CONSULTANT_MODEL=consultant-model
+      - PROMETHEUS_CHEAP_MODEL=utility-model
+      - PROMETHEUS_AUTO_APPLY=false
       - REDIS_HOST=redis
       - CHROMA_HOST=chromadb
     depends_on:
@@ -69,9 +78,9 @@ services:
     networks:
       - prometheus-net
 
-  # 6. The Front Desk (Telegram Gateway)
+  # 6. Telegram gateway
   prometheus-frontdesk:
-    build: 
+    build:
       context: ./
       dockerfile: docker/Manager.Dockerfile
     command: ["python", "telegram_gateway.py"]
@@ -88,7 +97,7 @@ services:
     networks:
       - prometheus-net
 
-  # 7. Web Dashboard (Frontend)
+  # 7. Web dashboard frontend
   dashboard:
     image: node:18-alpine
     working_dir: /app
@@ -96,15 +105,22 @@ services:
       - ./dashboard:/app
     ports:
       - "5173:5173"
-    command: ["npm", "run", "dev", "--", "--host"]
+    environment:
+      - VITE_API_BASE=http://localhost:8000
+      - VITE_WS_BASE=ws://localhost:8000
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      - backend
     networks:
       - prometheus-net
 
-  # 8. Dashboard Backend
+  # 8. Dashboard/API backend
   backend:
     build:
       context: ./
       dockerfile: docker/Manager.Dockerfile
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    working_dir: /app
     volumes:
       - ./backend:/app
       - ./workspace:/app/workspace
@@ -118,7 +134,7 @@ services:
     networks:
       - prometheus-net
 
-  # 9. Remote Vision & Hands Bridge
+  # 9. Remote vision and hands bridge
   vision-bridge:
     build:
       context: ./
@@ -129,6 +145,10 @@ services:
     ports:
       - "8765:8765"
     command: ["python", "vps_receiver.py"]
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
     networks:
       - prometheus-net
 
