@@ -65,13 +65,18 @@ def make_redis(config: RuntimeConfig) -> redis.Redis:
     return redis.Redis(host=config.redis_host, port=config.redis_port, decode_responses=True, socket_connect_timeout=3, socket_timeout=3)
 
 
+def safe_redis(label: str, func, default: Any = None) -> Any:
+    try:
+        return func()
+    except redis.RedisError as exc:
+        print(f"[SYSTEM] Redis unavailable during {label}: {exc}")
+        return default
+
+
 def dashboard_log(r: redis.Redis, msg: str, agent: str = "consultant") -> None:
     payload = {"time": now(), "type": agent.lower(), "msg": msg}
-    try:
-        r.lpush("prometheus_logs", json.dumps(payload))
-        r.ltrim("prometheus_logs", 0, 500)
-    finally:
-        print(f"[{agent.upper()}] {msg}")
+    safe_redis("dashboard log", lambda: (r.lpush("prometheus_logs", json.dumps(payload)), r.ltrim("prometheus_logs", 0, 500)))
+    print(f"[{agent.upper()}] {msg}")
 
 
 def notify(r: redis.Redis, text: str, chat_id: Optional[int] = None, approval_gate: bool = False, approval_id: Optional[str] = None) -> None:
@@ -80,7 +85,7 @@ def notify(r: redis.Redis, text: str, chat_id: Optional[int] = None, approval_ga
         payload["chat_id"] = chat_id
     if approval_id:
         payload["approval_id"] = approval_id
-    r.lpush("prometheus_notifications", json.dumps(payload))
+    safe_redis("notification push", lambda: r.lpush("prometheus_notifications", json.dumps(payload)))
 
 
 def load_ignore_patterns(workspace: Path) -> List[str]:
@@ -270,14 +275,12 @@ def create_approval(r: redis.Redis, task: str, patches: List[Dict[str, Any]], ch
         "created_at": datetime.utcnow().isoformat() + "Z",
         "updated_at": datetime.utcnow().isoformat() + "Z",
     }
-    r.set(approval_key(approval_id), json.dumps(approval))
-    r.lpush(APPROVAL_INDEX, approval_id)
-    r.ltrim(APPROVAL_INDEX, 0, 99)
+    safe_redis("approval create", lambda: (r.set(approval_key(approval_id), json.dumps(approval)), r.lpush(APPROVAL_INDEX, approval_id), r.ltrim(APPROVAL_INDEX, 0, 99)))
     return approval
 
 
 def read_approval(r: redis.Redis, approval_id: str) -> Dict[str, Any]:
-    raw = r.get(approval_key(approval_id))
+    raw = safe_redis("approval read", lambda: r.get(approval_key(approval_id)))
     if not raw:
         return {"id": approval_id, "status": "missing"}
     try:
@@ -289,7 +292,7 @@ def read_approval(r: redis.Redis, approval_id: str) -> Dict[str, Any]:
 def update_approval(r: redis.Redis, approval: Dict[str, Any], status: str) -> Dict[str, Any]:
     approval["status"] = status
     approval["updated_at"] = datetime.utcnow().isoformat() + "Z"
-    r.set(approval_key(str(approval["id"])), json.dumps(approval))
+    safe_redis("approval update", lambda: r.set(approval_key(str(approval["id"])), json.dumps(approval)))
     return approval
 
 
@@ -299,9 +302,9 @@ async def wait_for_approval(r: redis.Redis, approval_id: str, timeout_seconds: i
         approval = read_approval(r, approval_id)
         if approval.get("status") in {"approved", "rejected"}:
             return approval
-        legacy = r.get("prometheus_approval")
+        legacy = safe_redis("legacy approval read", lambda: r.get("prometheus_approval"))
         if legacy in {"approved", "rejected"}:
-            r.delete("prometheus_approval")
+            safe_redis("legacy approval clear", lambda: r.delete("prometheus_approval"))
             return update_approval(r, approval, legacy)
         await asyncio.sleep(2)
         waited += 2
@@ -384,11 +387,11 @@ async def poll_for_tasks() -> None:
     config.workspace.mkdir(parents=True, exist_ok=True)
     dashboard_log(r, f"{config.app_name} consultant runtime is polling for tasks", "system")
     while True:
-        if r.get("prometheus_kill_switch") == "true":
-            r.delete("prometheus_kill_switch")
+        if safe_redis("kill switch read", lambda: r.get("prometheus_kill_switch")) == "true":
+            safe_redis("kill switch clear", lambda: r.delete("prometheus_kill_switch"))
             dashboard_log(r, "Kill switch received. Runtime paused.", "system")
             break
-        task_data = r.rpop("prometheus_tasks")
+        task_data = safe_redis("task pop", lambda: r.rpop("prometheus_tasks"))
         if task_data:
             try:
                 payload = json.loads(task_data)
