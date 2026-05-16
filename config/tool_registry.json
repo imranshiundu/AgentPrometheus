@@ -4,7 +4,22 @@
       "name": "autogpt",
       "label": "AutoGPT",
       "status": "planned",
-      "notes": "Prometheus will expose this as a callable tool through backend routes after the bridge adapter is added."
+      "feature_flag": "autogpt",
+      "queue": "prometheus_tool:autogpt:tasks",
+      "routes": [
+        "GET /tools",
+        "GET /tools/autogpt",
+        "POST /tools/autogpt/tasks",
+        "GET /tools/autogpt/results/{run_id}"
+      ],
+      "capabilities": [
+        "goal planning",
+        "task breakdown",
+        "long running work handoff",
+        "tool execution handoff",
+        "result reporting"
+      ],
+      "notes": "Prometheus owns the route and queue contract. A separate AutoGPT gateway or worker should consume the queue and write results back."
     }
   ]
 }
