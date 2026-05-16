@@ -1,6 +1,8 @@
 import asyncio
 import json
 import os
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from runtime_features import FEATURE_MODES, clear_feature_request, list_features, request_feature, set_feature_mode
+from runtime_features import FEATURE_MODES, clear_feature_request, feature_active, list_features, request_feature, set_feature_mode
 
 APP_NAME = os.getenv("APP_NAME", os.getenv("RUNTIME_APP_NAME", "Workspace Runtime"))
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -26,6 +28,11 @@ CHEAP_MODEL = os.getenv("PROMETHEUS_CHEAP_MODEL", "utility-model")
 AUTO_APPLY = os.getenv("PROMETHEUS_AUTO_APPLY", "false").lower() == "true"
 WORKSPACE = Path(os.getenv("PROMETHEUS_WORKSPACE", "workspace"))
 PRODUCTION_DIR = WORKSPACE / "production"
+TOOL_REGISTRY = Path(os.getenv("PROMETHEUS_TOOL_REGISTRY", "config/tool_registry.json"))
+TOOL_QUEUE_PREFIX = os.getenv("PROMETHEUS_TOOL_QUEUE_PREFIX", "prometheus_tool")
+TOOL_RESULT_PREFIX = os.getenv("PROMETHEUS_TOOL_RESULT_PREFIX", "prometheus_tool_result")
+AUTOGPT_TASK_QUEUE = os.getenv("PROMETHEUS_AUTOGPT_TASK_QUEUE", f"{TOOL_QUEUE_PREFIX}:autogpt:tasks")
+AUTOGPT_RESULT_PREFIX = os.getenv("PROMETHEUS_AUTOGPT_RESULT_PREFIX", f"{TOOL_RESULT_PREFIX}:autogpt")
 
 app = FastAPI(title=f"{APP_NAME} Runtime API")
 
@@ -45,6 +52,16 @@ class FeatureModeRequest(BaseModel):
 
 class FeatureRequest(BaseModel):
     reason: str = "requested by user"
+
+
+class ToolTaskRequest(BaseModel):
+    task: str
+    source: str = "dashboard"
+    metadata: dict[str, Any] = {}
+
+
+def utc_now() -> str:
+    return datetime.utcnow().isoformat() + "Z"
 
 
 def parse_json(value: str | None, fallback: Any = None) -> Any:
@@ -103,6 +120,41 @@ def approval_key(approval_id: str) -> str:
     return f"{APPROVAL_KEY_PREFIX}:{approval_id}"
 
 
+def tool_result_key(tool_name: str, run_id: str) -> str:
+    if tool_name == "autogpt":
+        return f"{AUTOGPT_RESULT_PREFIX}:{run_id}"
+    return f"{TOOL_RESULT_PREFIX}:{tool_name}:{run_id}"
+
+
+def load_tool_registry() -> dict[str, Any]:
+    if not TOOL_REGISTRY.exists():
+        return {"tools": []}
+    data = parse_json(TOOL_REGISTRY.read_text(encoding="utf-8", errors="ignore"), {"tools": []})
+    return data if isinstance(data, dict) else {"tools": []}
+
+
+def tool_by_name(tool_name: str) -> dict[str, Any]:
+    for tool in load_tool_registry().get("tools", []):
+        if isinstance(tool, dict) and tool.get("name") == tool_name:
+            return tool
+    raise HTTPException(status_code=404, detail=f"Unknown tool: {tool_name}")
+
+
+def tool_status(tool: dict[str, Any]) -> dict[str, Any]:
+    name = str(tool.get("name"))
+    feature_name = str(tool.get("feature_flag") or name)
+    queue_name = str(tool.get("queue") or (AUTOGPT_TASK_QUEUE if name == "autogpt" else f"{TOOL_QUEUE_PREFIX}:{name}:tasks"))
+    active = feature_active(r, feature_name)
+    return {
+        **tool,
+        "feature_active": active,
+        "queue": queue_name,
+        "queue_depth": redis_llen(queue_name),
+        "connected": active,
+        "status": "ready" if active else "feature_inactive",
+    }
+
+
 def read_approval(approval_id: str) -> dict[str, Any]:
     raw = redis_get(approval_key(approval_id))
     if not raw:
@@ -118,7 +170,7 @@ def update_approval_status(approval_id: str, status: str) -> dict[str, Any]:
     if approval.get("status") not in {"pending", "approved", "rejected"}:
         raise HTTPException(status_code=409, detail=f"Approval is already {approval.get('status')}")
     approval["status"] = status
-    approval["updated_at"] = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+    approval["updated_at"] = utc_now()
     redis_set_json(approval_key(approval_id), approval)
     return approval
 
@@ -160,7 +212,7 @@ async def health():
 
 @app.get("/runtime/config")
 async def runtime_config():
-    return {"app_name": APP_NAME, "runtime": "consultant", "consultant_model": CONSULTANT_MODEL, "cheap_model": CHEAP_MODEL, "auto_apply": AUTO_APPLY, "workspace": str(WORKSPACE), "task_queue": TASK_QUEUE, "log_stream": LOG_STREAM, "notification_channel": NOTIFICATION_CHANNEL, "approval_index": APPROVAL_INDEX, "feature_modes": sorted(FEATURE_MODES)}
+    return {"app_name": APP_NAME, "runtime": "consultant", "consultant_model": CONSULTANT_MODEL, "cheap_model": CHEAP_MODEL, "auto_apply": AUTO_APPLY, "workspace": str(WORKSPACE), "task_queue": TASK_QUEUE, "log_stream": LOG_STREAM, "notification_channel": NOTIFICATION_CHANNEL, "approval_index": APPROVAL_INDEX, "feature_modes": sorted(FEATURE_MODES), "tool_registry": str(TOOL_REGISTRY)}
 
 
 @app.get("/runtime/routes")
@@ -196,6 +248,44 @@ async def clear_runtime_feature_request(feature_name: str):
     return feature_or_404(feature_name, lambda: clear_feature_request(r, feature_name))
 
 
+@app.get("/tools")
+async def get_tools():
+    return [tool_status(tool) for tool in load_tool_registry().get("tools", []) if isinstance(tool, dict)]
+
+
+@app.get("/tools/{tool_name}")
+async def get_tool(tool_name: str):
+    return tool_status(tool_by_name(tool_name))
+
+
+@app.post("/tools/{tool_name}/tasks")
+async def create_tool_task(tool_name: str, request: ToolTaskRequest):
+    tool = tool_status(tool_by_name(tool_name))
+    feature_name = str(tool.get("feature_flag") or tool_name)
+    if not feature_active(r, feature_name):
+        raise HTTPException(status_code=409, detail=f"Tool feature is not active: {feature_name}")
+    task = request.task.strip()
+    if not task:
+        raise HTTPException(status_code=400, detail="Task cannot be empty")
+    run_id = uuid.uuid4().hex[:12]
+    payload = {"run_id": run_id, "tool": tool_name, "task": task, "source": request.source, "status": "queued", "metadata": request.metadata, "created_at": utc_now()}
+    redis_lpush(str(tool["queue"]), json.dumps(payload))
+    redis_set_json(tool_result_key(tool_name, run_id), payload)
+    return {**payload, "queue": tool["queue"]}
+
+
+@app.get("/tools/{tool_name}/results/{run_id}")
+async def get_tool_result(tool_name: str, run_id: str):
+    tool_by_name(tool_name)
+    raw = redis_get(tool_result_key(tool_name, run_id))
+    if not raw:
+        raise HTTPException(status_code=404, detail="Tool result not found")
+    parsed = parse_json(raw, None)
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=500, detail="Tool result is corrupt")
+    return parsed
+
+
 @app.get("/vision_node.py")
 async def get_vision_node():
     path = Path("vision_node.py")
@@ -209,7 +299,8 @@ async def get_stats():
     health = redis_health()
     pending = [item for item in await list_approvals() if item.get("status") == "pending"]
     features = list_features(r)
-    return {"tokens": redis_get("prometheus_token_count", "0") or "0", "health": health.upper(), "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1", "queue_depth": redis_llen(TASK_QUEUE), "log_count": redis_llen(LOG_STREAM), "notification_count": redis_llen(NOTIFICATION_CHANNEL), "pending_approval_count": len(pending), "active_feature_count": len([item for item in features if item.get("active")]), "kill_switch": redis_get(KILL_SWITCH_KEY) == "true", "runtime": "consultant", "app_name": APP_NAME}
+    tools = [tool_status(tool) for tool in load_tool_registry().get("tools", []) if isinstance(tool, dict)]
+    return {"tokens": redis_get("prometheus_token_count", "0") or "0", "health": health.upper(), "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1", "queue_depth": redis_llen(TASK_QUEUE), "log_count": redis_llen(LOG_STREAM), "notification_count": redis_llen(NOTIFICATION_CHANNEL), "pending_approval_count": len(pending), "active_feature_count": len([item for item in features if item.get("active")]), "tool_count": len(tools), "connected_tool_count": len([item for item in tools if item.get("connected")]), "kill_switch": redis_get(KILL_SWITCH_KEY) == "true", "runtime": "consultant", "app_name": APP_NAME}
 
 
 @app.get("/logs")
