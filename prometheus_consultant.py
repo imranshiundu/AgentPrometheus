@@ -5,6 +5,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,8 @@ TEXT_EXTENSIONS = {
 }
 SPECIAL_TEXT_FILENAMES = {"Dockerfile", "Makefile"}
 PROTECTED_PATH_PARTS = {".git", "node_modules", "venv", "__pycache__", "hive_mind_db"}
+APPROVAL_INDEX = os.getenv("PROMETHEUS_APPROVAL_INDEX", "prometheus_approvals")
+APPROVAL_KEY_PREFIX = os.getenv("PROMETHEUS_APPROVAL_KEY_PREFIX", "prometheus_approval")
 
 
 @dataclass
@@ -47,10 +50,15 @@ class RuntimeConfig:
     evidence_budget: int = int(os.getenv("PROMETHEUS_EVIDENCE_BUDGET", "28000"))
     approval_timeout: int = int(os.getenv("PROMETHEUS_APPROVAL_TIMEOUT", "1800"))
     auto_apply: bool = os.getenv("PROMETHEUS_AUTO_APPLY", "false").lower() == "true"
+    require_approval: bool = os.getenv("PROMETHEUS_REQUIRE_APPROVAL", "true").lower() != "false"
 
 
 def now() -> str:
     return datetime.now().strftime("%H:%M:%S")
+
+
+def timestamp() -> str:
+    return datetime.utcnow().strftime("%Y%m%d-%H%M%S")
 
 
 def make_redis(config: RuntimeConfig) -> redis.Redis:
@@ -66,10 +74,12 @@ def dashboard_log(r: redis.Redis, msg: str, agent: str = "consultant") -> None:
         print(f"[{agent.upper()}] {msg}")
 
 
-def notify(r: redis.Redis, text: str, chat_id: Optional[int] = None, approval_gate: bool = False) -> None:
+def notify(r: redis.Redis, text: str, chat_id: Optional[int] = None, approval_gate: bool = False, approval_id: Optional[str] = None) -> None:
     payload: Dict[str, Any] = {"text": text, "approval_gate": approval_gate}
     if chat_id is not None:
         payload["chat_id"] = chat_id
+    if approval_id:
+        payload["approval_id"] = approval_id
     r.lpush("prometheus_notifications", json.dumps(payload))
 
 
@@ -245,7 +255,61 @@ def apply_patches(patches: List[Dict[str, Any]], config: RuntimeConfig) -> List[
     return results
 
 
-def render_report(task: str, plan: Dict[str, Any], diagnostics: Dict[str, Any], patch_results: Optional[List[Dict[str, Any]]] = None) -> str:
+def approval_key(approval_id: str) -> str:
+    return f"{APPROVAL_KEY_PREFIX}:{approval_id}"
+
+
+def create_approval(r: redis.Redis, task: str, patches: List[Dict[str, Any]], chat_id: Optional[int]) -> Dict[str, Any]:
+    approval_id = uuid.uuid4().hex[:12]
+    approval = {
+        "id": approval_id,
+        "status": "pending",
+        "task": task,
+        "patches": patches[:20],
+        "chat_id": chat_id,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    r.set(approval_key(approval_id), json.dumps(approval))
+    r.lpush(APPROVAL_INDEX, approval_id)
+    r.ltrim(APPROVAL_INDEX, 0, 99)
+    return approval
+
+
+def read_approval(r: redis.Redis, approval_id: str) -> Dict[str, Any]:
+    raw = r.get(approval_key(approval_id))
+    if not raw:
+        return {"id": approval_id, "status": "missing"}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"id": approval_id, "status": "corrupt"}
+
+
+def update_approval(r: redis.Redis, approval: Dict[str, Any], status: str) -> Dict[str, Any]:
+    approval["status"] = status
+    approval["updated_at"] = datetime.utcnow().isoformat() + "Z"
+    r.set(approval_key(str(approval["id"])), json.dumps(approval))
+    return approval
+
+
+async def wait_for_approval(r: redis.Redis, approval_id: str, timeout_seconds: int) -> Dict[str, Any]:
+    waited = 0
+    while waited < timeout_seconds:
+        approval = read_approval(r, approval_id)
+        if approval.get("status") in {"approved", "rejected"}:
+            return approval
+        legacy = r.get("prometheus_approval")
+        if legacy in {"approved", "rejected"}:
+            r.delete("prometheus_approval")
+            return update_approval(r, approval, legacy)
+        await asyncio.sleep(2)
+        waited += 2
+    approval = read_approval(r, approval_id)
+    return update_approval(r, approval, "expired")
+
+
+def render_report(task: str, plan: Dict[str, Any], diagnostics: Dict[str, Any], patch_results: Optional[List[Dict[str, Any]]] = None, approval: Optional[Dict[str, Any]] = None) -> str:
     return json.dumps({
         "task": task,
         "summary": plan.get("summary"),
@@ -255,9 +319,19 @@ def render_report(task: str, plan: Dict[str, Any], diagnostics: Dict[str, Any], 
         "risks": plan.get("risks", []),
         "missing_evidence": plan.get("missing_evidence", []),
         "confidence": plan.get("confidence", "unknown"),
+        "approval": approval,
         "diagnostics": diagnostics,
         "patch_results": patch_results or [],
     }, indent=2, ensure_ascii=False)
+
+
+def write_report(config: RuntimeConfig, task: str, report: str) -> Path:
+    report_dir = config.workspace / "production" / "reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    name = f"{timestamp()}-{sha(task)}.json"
+    path = report_dir / name
+    path.write_text(report, encoding="utf-8")
+    return path
 
 
 async def run_task(task: str, chat_id: Optional[int], config: RuntimeConfig, r: redis.Redis) -> str:
@@ -268,15 +342,38 @@ async def run_task(task: str, chat_id: Optional[int], config: RuntimeConfig, r: 
     dashboard_log(r, "Consultant plan received", "consultant")
 
     patch_results: List[Dict[str, Any]] = []
+    approval: Optional[Dict[str, Any]] = None
     patches = plan.get("patches") or []
-    if patches and config.auto_apply:
+
+    if patches and config.auto_apply and not config.require_approval:
         dashboard_log(r, f"Applying {len(patches)} consultant patch operations", "patcher")
         patch_results = apply_patches(patches, config)
         plan["post_patch_diagnostics"] = collect_evidence(task, config).get("diagnostics", {})
     elif patches:
-        notify(r, "Approval required before file edits. Consultant proposed patches:\n\n```json\n" + json.dumps(patches[:5], indent=2)[:3500] + "\n```", chat_id=chat_id, approval_gate=False)
+        approval = create_approval(r, task, patches, chat_id)
+        dashboard_log(r, f"Patch approval requested: {approval['id']}", "approval")
+        notify(
+            r,
+            "Approval required before file edits.\n\n"
+            f"Approval ID: `{approval['id']}`\n\n"
+            "Proposed patches:\n\n```json\n" + json.dumps(patches[:5], indent=2)[:3000] + "\n```",
+            chat_id=chat_id,
+            approval_gate=True,
+            approval_id=str(approval["id"]),
+        )
+        approval = await wait_for_approval(r, str(approval["id"]), config.approval_timeout)
+        if approval.get("status") == "approved":
+            dashboard_log(r, f"Approval received: {approval['id']}", "approval")
+            patch_results = apply_patches(patches, config)
+            approval = update_approval(r, approval, "applied")
+            plan["post_patch_diagnostics"] = collect_evidence(task, config).get("diagnostics", {})
+        else:
+            dashboard_log(r, f"Patch application skipped: approval {approval.get('status')}", "approval")
+            patch_results = [{"applied": False, "reason": f"approval {approval.get('status')}", "approval_id": approval.get("id")}]
 
-    report = render_report(task, plan, packet.get("diagnostics", {}), patch_results)
+    report = render_report(task, plan, packet.get("diagnostics", {}), patch_results, approval)
+    report_path = write_report(config, task, report)
+    dashboard_log(r, f"Report artifact written: {report_path.relative_to(config.workspace).as_posix()}", "artifact")
     notify(r, "Consultant run complete:\n\n```json\n" + report[:3500] + "\n```", chat_id=chat_id)
     return report
 
