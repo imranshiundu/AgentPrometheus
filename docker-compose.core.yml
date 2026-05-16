@@ -1,0 +1,164 @@
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    volumes:
+      - ./config/litellm_config.yaml:/app/config.yaml:ro
+    ports:
+      - "4000:4000"
+    environment:
+      - REAL_API_KEY=${REAL_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - runtime-net
+
+  redis:
+    image: redis:alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - runtime-net
+
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes:
+      - ./workspace/hive_mind_db:/chroma/chroma
+    ports:
+      - "8001:8000"
+    networks:
+      - runtime-net
+
+  prometheus-orchestrator:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["python", "prometheus_consultant.py"]
+    restart: unless-stopped
+    volumes:
+      - ./workspace:/app/workspace
+      - ./prometheus_consultant.py:/app/prometheus_consultant.py
+      - ./prometheus_indexer.py:/app/prometheus_indexer.py
+      - ./prometheus_json.py:/app/prometheus_json.py
+      - ./.prometheusignore:/app/.prometheusignore
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - OPENAI_API_BASE=http://litellm:4000/v1
+      - OPENAI_API_KEY=sk-prometheus-dummy
+      - PROMETHEUS_CONSULTANT_MODEL=consultant-model
+      - PROMETHEUS_CHEAP_MODEL=utility-model
+      - PROMETHEUS_AUTO_APPLY=false
+      - PROMETHEUS_REQUIRE_APPROVAL=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CHROMA_HOST=chromadb
+    depends_on:
+      redis:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+      chromadb:
+        condition: service_started
+    networks:
+      - runtime-net
+
+  prometheus-frontdesk:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["python", "telegram_gateway.py"]
+    restart: unless-stopped
+    volumes:
+      - ./workspace:/app/workspace
+      - ./telegram_gateway.py:/app/telegram_gateway.py
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VPS_PUBLIC_IP=${VPS_PUBLIC_IP}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - runtime-net
+
+  dashboard:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./dashboard:/app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_APP_NAME=${APP_NAME:-Workspace Runtime}
+      - VITE_API_BASE=${VITE_API_BASE:-http://localhost:8000}
+      - VITE_WS_BASE=${VITE_WS_BASE:-ws://localhost:8000}
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - runtime-net
+
+  backend:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - ./workspace:/app/workspace
+      - ./vision_node.py:/app/vision_node.py
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - runtime-net
+
+  vision-bridge:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    volumes:
+      - ./vps_receiver.py:/app/vps_receiver.py
+      - ./workspace:/app/workspace
+    ports:
+      - "8765:8765"
+    command: ["python", "vps_receiver.py"]
+    restart: unless-stopped
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - runtime-net
+
+networks:
+  runtime-net:
+    driver: bridge
