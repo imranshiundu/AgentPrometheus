@@ -1,0 +1,168 @@
+services:
+  redis:
+    image: redis:alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - lean-runtime
+
+  backend:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - ./workspace:/app/workspace
+      - ./vision_node.py:/app/vision_node.py
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - lean-runtime
+
+  consultant:
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["python", "prometheus_consultant.py"]
+    restart: unless-stopped
+    volumes:
+      - ./workspace:/app/workspace
+      - ./prometheus_consultant.py:/app/prometheus_consultant.py
+      - ./prometheus_indexer.py:/app/prometheus_indexer.py
+      - ./prometheus_json.py:/app/prometheus_json.py
+      - ./.prometheusignore:/app/.prometheusignore
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PROMETHEUS_CONSULTANT_MODEL=${PROMETHEUS_CONSULTANT_MODEL:-gpt-4o-mini}
+      - PROMETHEUS_CHEAP_MODEL=${PROMETHEUS_CHEAP_MODEL:-gpt-4o-mini}
+      - PROMETHEUS_AUTO_APPLY=false
+      - PROMETHEUS_REQUIRE_APPROVAL=true
+      - PROMETHEUS_MAX_FILES=${PROMETHEUS_MAX_FILES:-80}
+      - PROMETHEUS_MAX_FILE_CHARS=${PROMETHEUS_MAX_FILE_CHARS:-4000}
+      - PROMETHEUS_EVIDENCE_BUDGET=${PROMETHEUS_EVIDENCE_BUDGET:-18000}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - lean-runtime
+
+  dashboard:
+    build:
+      context: ./
+      dockerfile: docker/Dashboard.Dockerfile
+      args:
+        VITE_APP_NAME: ${APP_NAME:-Workspace Runtime}
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
+        VITE_WS_BASE: ${VITE_WS_BASE:-ws://localhost:8000}
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - lean-runtime
+
+  telegram:
+    profiles: ["telegram"]
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    command: ["python", "telegram_gateway.py"]
+    restart: unless-stopped
+    volumes:
+      - ./workspace:/app/workspace
+      - ./telegram_gateway.py:/app/telegram_gateway.py
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - VPS_PUBLIC_IP=${VPS_PUBLIC_IP}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - lean-runtime
+
+  litellm:
+    profiles: ["router"]
+    image: ghcr.io/berriai/litellm:main-latest
+    volumes:
+      - ./config/litellm_config.yaml:/app/config.yaml:ro
+    ports:
+      - "4000:4000"
+    environment:
+      - REAL_API_KEY=${REAL_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - lean-runtime
+
+  chromadb:
+    profiles: ["memory"]
+    image: chromadb/chroma:latest
+    volumes:
+      - ./workspace/hive_mind_db:/chroma/chroma
+    ports:
+      - "8001:8000"
+    networks:
+      - lean-runtime
+
+  vision-bridge:
+    profiles: ["vision"]
+    build:
+      context: ./
+      dockerfile: docker/Manager.Dockerfile
+    volumes:
+      - ./vps_receiver.py:/app/vps_receiver.py
+      - ./workspace:/app/workspace
+    ports:
+      - "8765:8765"
+    command: ["python", "vps_receiver.py"]
+    restart: unless-stopped
+    environment:
+      - APP_NAME=${APP_NAME:-Workspace Runtime}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - lean-runtime
+
+networks:
+  lean-runtime:
+    driver: bridge
