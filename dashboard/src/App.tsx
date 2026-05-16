@@ -22,6 +22,7 @@ type RuntimeStats = {
   queue_depth?: number;
   log_count?: number;
   notification_count?: number;
+  pending_approval_count?: number;
   kill_switch?: boolean;
   runtime?: string;
   app_name?: string;
@@ -39,6 +40,7 @@ type RuntimeConfig = {
 };
 type RuntimeFile = { name: string; size?: number; modified?: number };
 type RuntimeRoute = { path: string; methods: string[] };
+type Approval = { id: string; status: string; task?: string; patches?: unknown[]; created_at?: string; updated_at?: string };
 
 const configuredApiBase = import.meta.env.VITE_API_BASE;
 const configuredWsBase = import.meta.env.VITE_WS_BASE;
@@ -65,6 +67,7 @@ const Dashboard = () => {
   const [queue, setQueue] = useState<Record<string, unknown>[]>([]);
   const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [routes, setRoutes] = useState<RuntimeRoute[]>([]);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
 
   const appName = config.app_name || statsData.app_name || FALLBACK_APP_NAME;
 
@@ -81,7 +84,7 @@ const Dashboard = () => {
   };
 
   const refreshRuntime = async () => {
-    const [stats, runtimeConfig, artifactList, reportList, queueList, notificationList, routeList] = await Promise.all([
+    const [stats, runtimeConfig, artifactList, reportList, queueList, notificationList, routeList, approvalList] = await Promise.all([
       loadJson<RuntimeStats>('/stats', {}),
       loadJson<RuntimeConfig>('/runtime/config', {}),
       loadJson<RuntimeFile[]>('/artifacts', []),
@@ -89,6 +92,7 @@ const Dashboard = () => {
       loadJson<Record<string, unknown>[]>('/queue', []),
       loadJson<Record<string, unknown>[]>('/notifications', []),
       loadJson<RuntimeRoute[]>('/runtime/routes', []),
+      loadJson<Approval[]>('/approvals', []),
     ]);
     setStatsData(stats);
     setConfig(runtimeConfig);
@@ -97,6 +101,7 @@ const Dashboard = () => {
     setQueue(queueList);
     setNotifications(notificationList);
     setRoutes(routeList);
+    setApprovals(approvalList);
   };
 
   useEffect(() => {
@@ -157,6 +162,11 @@ const Dashboard = () => {
     await refreshRuntime();
   };
 
+  const decideApproval = async (id: string, decision: 'approve' | 'reject') => {
+    await fetch(`${API_BASE}/approvals/${id}/${decision}`, { method: 'POST' });
+    await refreshRuntime();
+  };
+
   const nav = [
     { id: 'command' as Section, label: 'Command Center', icon: <Terminal size={18} /> },
     { id: 'memory' as Section, label: 'Runtime Memory', icon: <Database size={18} /> },
@@ -173,6 +183,22 @@ const Dashboard = () => {
     </div>
   );
 
+  const renderApprovals = () => (
+    <div className="console-box">
+      <div className="box-header"><span>Patch Approvals</span><span>{statsData.pending_approval_count ?? approvals.filter((item) => item.status === 'pending').length} pending</span></div>
+      <div className="log-stream">
+        {approvals.length === 0 ? <div className="log-entry system">No approval requests.</div> : approvals.map((approval) => (
+          <div key={approval.id} className="log-entry system" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: '0.5rem' }}>
+            <span><strong>{approval.id}</strong> — {approval.status}</span>
+            <span>{approval.task || 'No task summary.'}</span>
+            <span>{approval.patches?.length || 0} patch operation(s)</span>
+            {approval.status === 'pending' && <span style={{ display: 'flex', gap: '0.5rem' }}><button onClick={() => decideApproval(approval.id, 'approve')}>Approve</button><button onClick={() => decideApproval(approval.id, 'reject')}>Reject</button></span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderSection = () => {
     if (section === 'artifacts') {
       return <div className="console-box"><div className="box-header"><span>Artifact Registry</span></div><div className="log-stream">{artifacts.length === 0 ? <div className="log-entry system">No artifacts found.</div> : artifacts.map((file) => <div key={file.name} className="log-entry system"><a href={`${API_BASE}/artifacts/${file.name}`} target="_blank" rel="noreferrer">{file.name}</a><span>{bytes(file.size)}</span></div>)}</div></div>;
@@ -184,36 +210,21 @@ const Dashboard = () => {
       return <div className="console-section"><div className="console-box"><div className="box-header"><span>Queued Work</span></div>{renderList(queue, 'No queued tasks.')}</div><div className="console-box"><div className="box-header"><span>Notifications</span></div>{renderList(notifications, 'No notifications.')}</div></div>;
     }
     if (section === 'settings') {
-      return <div className="console-section"><div className="console-box"><div className="box-header"><span>Runtime Config</span><button onClick={toggleKillSwitch}>{statsData.kill_switch ? 'Clear Kill Switch' : 'Trigger Kill Switch'}</button></div><div className="log-stream"><div className="log-entry system"><span>{JSON.stringify(config, null, 2)}</span></div></div></div><div className="console-box"><div className="box-header"><span>Connected API Routes</span></div><div className="log-stream">{routes.map((route) => <div key={route.path} className="log-entry system"><span>{route.methods.join(', ') || 'WS'}</span><span>{route.path}</span></div>)}</div></div></div>;
+      return <div className="console-section">{renderApprovals()}<div className="console-box"><div className="box-header"><span>Runtime Config</span><button onClick={toggleKillSwitch}>{statsData.kill_switch ? 'Clear Kill Switch' : 'Trigger Kill Switch'}</button></div><div className="log-stream"><div className="log-entry system"><span>{JSON.stringify(config, null, 2)}</span></div></div></div><div className="console-box"><div className="box-header"><span>Connected API Routes</span></div><div className="log-stream">{routes.map((route) => <div key={route.path} className="log-entry system"><span>{route.methods.join(', ') || 'WS'}</span><span>{route.path}</span></div>)}</div></div></div>;
     }
-    return <div className="console-section"><div className="console-box"><div className="box-header"><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Terminal size={16} /><span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Live Execution Stream</span></div></div><div className="log-stream">{logs.length === 0 ? <div className="log-entry system"><span>No runtime logs yet.</span></div> : logs.map((log, index) => <div key={`${log.time || 'log'}-${index}`} className={`log-entry ${log.type || 'system'}`}><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>[{log.time || '--:--:--'}]</span><span style={{ fontWeight: 600, minWidth: '90px', textTransform: 'uppercase', fontSize: '0.8rem' }}>{log.type || 'system'}:</span><span>{log.msg || JSON.stringify(log)}</span></div>)}</div></div><div className="agent-status-list"><h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Unified Runtime</h3><div className="agent-item"><div className="status-dot"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Evidence Scanner</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Collects files, routes, diagnostics, and repo index.</p></div></div><div className="agent-item"><div className="status-dot"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Consultant Runtime</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Asks the model for structured plans, not blind execution.</p></div></div><div className="agent-item"><div className="status-dot idle"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Patch Gate</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Auto-apply is off unless explicitly enabled.</p></div></div></div></div>;
+    return <div className="console-section"><div className="console-box"><div className="box-header"><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Terminal size={16} /><span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Live Execution Stream</span></div></div><div className="log-stream">{logs.length === 0 ? <div className="log-entry system"><span>No runtime logs yet.</span></div> : logs.map((log, index) => <div key={`${log.time || 'log'}-${index}`} className={`log-entry ${log.type || 'system'}`}><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>[{log.time || '--:--:--'}]</span><span style={{ fontWeight: 600, minWidth: '90px', textTransform: 'uppercase', fontSize: '0.8rem' }}>{log.type || 'system'}:</span><span>{log.msg || JSON.stringify(log)}</span></div>)}</div></div><div className="agent-status-list"><h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Unified Runtime</h3><div className="agent-item"><div className="status-dot"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Evidence Scanner</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Collects files, routes, diagnostics, and repo index.</p></div></div><div className="agent-item"><div className="status-dot"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Consultant Runtime</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Asks the model for structured plans, not blind execution.</p></div></div><div className="agent-item"><div className="status-dot idle"></div><div style={{ flex: 1 }}><p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Patch Gate</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Approval is required before file edits unless explicitly disabled.</p></div></div></div></div>;
   };
 
   return (
     <>
       <div className="sidebar">
-        <div className="logo-section">
-          <div className="logo-icon"><Shield color="white" fill="white" size={24} /></div>
-          <h2 style={{ fontWeight: 800, letterSpacing: '-1px' }}>{appName}</h2>
-        </div>
-        <div className="nav-links">
-          {nav.map((item) => <button key={item.id} className={`nav-item ${section === item.id ? 'active' : ''}`} onClick={() => setSection(item.id)}>{item.icon} {item.label}</button>)}
-        </div>
-        <div style={{ marginTop: 'auto', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>CURRENT MODEL ROUTE</p>
-          <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>{config.consultant_model || 'consultant-model'}</p>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>API: {apiStatus}</p>
-        </div>
+        <div className="logo-section"><div className="logo-icon"><Shield color="white" fill="white" size={24} /></div><h2 style={{ fontWeight: 800, letterSpacing: '-1px' }}>{appName}</h2></div>
+        <div className="nav-links">{nav.map((item) => <button key={item.id} className={`nav-item ${section === item.id ? 'active' : ''}`} onClick={() => setSection(item.id)}>{item.icon} {item.label}</button>)}</div>
+        <div style={{ marginTop: 'auto', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>CURRENT MODEL ROUTE</p><p style={{ fontSize: '0.9rem', fontWeight: 600 }}>{config.consultant_model || 'consultant-model'}</p><p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>API: {apiStatus}</p></div>
       </div>
       <div className="main-content">
-        <div className="header">
-          <div><h1 style={{ fontSize: '2rem', fontWeight: 800 }}>{nav.find((item) => item.id === section)?.label}</h1><p style={{ color: 'var(--text-muted)' }}>One runtime, one queue, one route map, one goal.</p></div>
-          <div className="status-badge" style={{ padding: '0.5rem 1rem', background: statsData.kill_switch ? 'rgba(231, 76, 60, 0.1)' : 'rgba(46, 204, 113, 0.1)', border: statsData.kill_switch ? '1px solid #e74c3c' : '1px solid #2ecc71', borderRadius: '20px', color: statsData.kill_switch ? '#e74c3c' : '#2ecc71', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}><div className="status-dot"></div>{statsData.kill_switch ? 'KILL SWITCH ACTIVE' : 'RUNTIME ACTIVE'}</div>
-        </div>
-        <form onSubmit={submitTask} style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          <input value={task} onChange={(event) => setTask(event.target.value)} placeholder={`Send a task to ${appName}...`} style={{ flex: 1, padding: '0.9rem 1rem', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.03)', color: 'white' }} />
-          <button type="submit" style={{ padding: '0.9rem 1.2rem', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Queue Task</button>
-        </form>
+        <div className="header"><div><h1 style={{ fontSize: '2rem', fontWeight: 800 }}>{nav.find((item) => item.id === section)?.label}</h1><p style={{ color: 'var(--text-muted)' }}>One runtime, one queue, one route map, one goal.</p></div><div className="status-badge" style={{ padding: '0.5rem 1rem', background: statsData.kill_switch ? 'rgba(231, 76, 60, 0.1)' : 'rgba(46, 204, 113, 0.1)', border: statsData.kill_switch ? '1px solid #e74c3c' : '1px solid #2ecc71', borderRadius: '20px', color: statsData.kill_switch ? '#e74c3c' : '#2ecc71', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}><div className="status-dot"></div>{statsData.kill_switch ? 'KILL SWITCH ACTIVE' : 'RUNTIME ACTIVE'}</div></div>
+        <form onSubmit={submitTask} style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}><input value={task} onChange={(event) => setTask(event.target.value)} placeholder={`Send a task to ${appName}...`} style={{ flex: 1, padding: '0.9rem 1rem', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.03)', color: 'white' }} /><button type="submit" style={{ padding: '0.9rem 1.2rem', borderRadius: '12px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Queue Task</button></form>
         <div className="stats-grid">{stats.map((stat, i) => <motion.div key={stat.label} className="stat-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span className="stat-label">{stat.label}</span>{stat.icon}</div><span className="stat-value">{stat.value}</span></motion.div>)}</div>
         {renderSection()}
       </div>
