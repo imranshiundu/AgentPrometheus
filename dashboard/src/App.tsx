@@ -22,7 +22,6 @@ type RuntimeStats = {
   queue_depth?: number;
   log_count?: number;
   notification_count?: number;
-  artifact_count?: number;
   kill_switch?: boolean;
   runtime?: string;
   app_name?: string;
@@ -41,8 +40,10 @@ type RuntimeConfig = {
 type RuntimeFile = { name: string; size?: number; modified?: number };
 type RuntimeRoute = { path: string; methods: string[] };
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
-const WS_BASE = import.meta.env.VITE_WS_BASE || 'ws://localhost:8000';
+const configuredApiBase = import.meta.env.VITE_API_BASE;
+const configuredWsBase = import.meta.env.VITE_WS_BASE;
+const API_BASE = configuredApiBase ?? '';
+const WS_BASE = configuredWsBase ?? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
 const FALLBACK_APP_NAME = import.meta.env.VITE_APP_NAME || 'Workspace Runtime';
 
 const bytes = (value?: number) => {
