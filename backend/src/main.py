@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from runtime_features import FEATURE_MODES, clear_feature_request, list_features, request_feature, set_feature_mode
+
 APP_NAME = os.getenv("APP_NAME", os.getenv("RUNTIME_APP_NAME", "Workspace Runtime"))
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -35,6 +37,14 @@ r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_
 class TaskRequest(BaseModel):
     task: str
     chat_id: int | None = None
+
+
+class FeatureModeRequest(BaseModel):
+    mode: str
+
+
+class FeatureRequest(BaseModel):
+    reason: str = "requested by user"
 
 
 def parse_json(value: str | None, fallback: Any = None) -> Any:
@@ -136,6 +146,13 @@ def list_files(root: Path) -> list[dict[str, Any]]:
     return files
 
 
+def feature_or_404(name: str, func):
+    try:
+        return func()
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown feature: {name}") from exc
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "redis": redis_health(), "app_name": APP_NAME}
@@ -143,7 +160,7 @@ async def health():
 
 @app.get("/runtime/config")
 async def runtime_config():
-    return {"app_name": APP_NAME, "runtime": "consultant", "consultant_model": CONSULTANT_MODEL, "cheap_model": CHEAP_MODEL, "auto_apply": AUTO_APPLY, "workspace": str(WORKSPACE), "task_queue": TASK_QUEUE, "log_stream": LOG_STREAM, "notification_channel": NOTIFICATION_CHANNEL, "approval_index": APPROVAL_INDEX}
+    return {"app_name": APP_NAME, "runtime": "consultant", "consultant_model": CONSULTANT_MODEL, "cheap_model": CHEAP_MODEL, "auto_apply": AUTO_APPLY, "workspace": str(WORKSPACE), "task_queue": TASK_QUEUE, "log_stream": LOG_STREAM, "notification_channel": NOTIFICATION_CHANNEL, "approval_index": APPROVAL_INDEX, "feature_modes": sorted(FEATURE_MODES)}
 
 
 @app.get("/runtime/routes")
@@ -155,6 +172,28 @@ async def runtime_routes():
         if path:
             routes.append({"path": path, "methods": methods})
     return routes
+
+
+@app.get("/features")
+async def get_features():
+    return list_features(r)
+
+
+@app.put("/features/{feature_name}")
+async def update_feature(feature_name: str, request: FeatureModeRequest):
+    if request.mode not in FEATURE_MODES:
+        raise HTTPException(status_code=400, detail="Feature mode must be one of: off, auto, on")
+    return feature_or_404(feature_name, lambda: set_feature_mode(r, feature_name, request.mode))
+
+
+@app.post("/features/{feature_name}/request")
+async def request_runtime_feature(feature_name: str, request: FeatureRequest):
+    return feature_or_404(feature_name, lambda: request_feature(r, feature_name, request.reason))
+
+
+@app.delete("/features/{feature_name}/request")
+async def clear_runtime_feature_request(feature_name: str):
+    return feature_or_404(feature_name, lambda: clear_feature_request(r, feature_name))
 
 
 @app.get("/vision_node.py")
@@ -169,7 +208,8 @@ async def get_vision_node():
 async def get_stats():
     health = redis_health()
     pending = [item for item in await list_approvals() if item.get("status") == "pending"]
-    return {"tokens": redis_get("prometheus_token_count", "0") or "0", "health": health.upper(), "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1", "queue_depth": redis_llen(TASK_QUEUE), "log_count": redis_llen(LOG_STREAM), "notification_count": redis_llen(NOTIFICATION_CHANNEL), "pending_approval_count": len(pending), "kill_switch": redis_get(KILL_SWITCH_KEY) == "true", "runtime": "consultant", "app_name": APP_NAME}
+    features = list_features(r)
+    return {"tokens": redis_get("prometheus_token_count", "0") or "0", "health": health.upper(), "active_agents": redis_get("prometheus_active_count", "1 / 1") or "1 / 1", "queue_depth": redis_llen(TASK_QUEUE), "log_count": redis_llen(LOG_STREAM), "notification_count": redis_llen(NOTIFICATION_CHANNEL), "pending_approval_count": len(pending), "active_feature_count": len([item for item in features if item.get("active")]), "kill_switch": redis_get(KILL_SWITCH_KEY) == "true", "runtime": "consultant", "app_name": APP_NAME}
 
 
 @app.get("/logs")
