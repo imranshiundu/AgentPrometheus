@@ -69,6 +69,7 @@ jobs:
       - name: Validate Docker Compose configuration
         env:
           APP_NAME: Workspace Runtime
+          OPENAI_API_KEY: placeholder
           REAL_API_KEY: placeholder
           ANTHROPIC_API_KEY: placeholder
           GEMINI_API_KEY: placeholder
@@ -79,18 +80,23 @@ jobs:
         run: |
           docker compose config >/tmp/prometheus-compose.yml
           docker compose -f docker-compose.core.yml config >/tmp/prometheus-core-compose.yml
+          docker compose -f docker-compose.lean.yml config >/tmp/prometheus-lean-compose.yml
           grep -q 'prometheus_consultant.py' /tmp/prometheus-compose.yml
           grep -q 'prometheus_consultant.py' /tmp/prometheus-core-compose.yml
+          grep -q 'prometheus_consultant.py' /tmp/prometheus-lean-compose.yml
           grep -q 'uvicorn' /tmp/prometheus-core-compose.yml
-          grep -q 'APP_NAME' /tmp/prometheus-core-compose.yml
+          grep -q 'uvicorn' /tmp/prometheus-lean-compose.yml
+          grep -q 'docker/Dashboard.Dockerfile' /tmp/prometheus-lean-compose.yml
+          grep -q 'profiles:' /tmp/prometheus-lean-compose.yml
           grep -q 'condition: service_healthy' /tmp/prometheus-core-compose.yml
+          grep -q 'condition: service_healthy' /tmp/prometheus-lean-compose.yml
           test -x tools/docker_smoke_check.sh || chmod +x tools/docker_smoke_check.sh
-          echo "Docker Compose configuration is valid and core runtime has a smoke-test entrypoint."
+          echo "Docker Compose configuration is valid for full, core, and lean modes."
 
       - name: Secret hygiene quick scan
         run: |
           set -euo pipefail
-          matches="$(git grep -nE '(sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY)' -- . ':!README.md' ':!docs/**' ':!docker-compose.yml' ':!docker-compose.core.yml' ':!config/**' ':!*.example' ':!**/*.example' || true)"
+          matches="$(git grep -nE '(sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY)' -- . ':!README.md' ':!docs/**' ':!docker-compose.yml' ':!docker-compose.core.yml' ':!docker-compose.lean.yml' ':!config/**' ':!*.example' ':!**/*.example' || true)"
           matches="$(printf '%s\n' "$matches" | grep -v 'sk-prometheus-dummy' || true)"
           if [ -n "$matches" ]; then
             printf '%s\n' "$matches"
