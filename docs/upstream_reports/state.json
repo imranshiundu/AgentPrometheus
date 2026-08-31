@@ -1,0 +1,22 @@
+{
+  "All-Hands-AI/OpenHands": {
+    "branch": "main",
+    "checked_at": "2026-08-31T09:40:24.758063+00:00",
+    "sha": "1098d73df42351a31b2940557efb9fe8750365c4"
+  },
+  "Significant-Gravitas/AutoGPT": {
+    "branch": "master",
+    "checked_at": "2026-08-31T09:40:24.292771+00:00",
+    "sha": "32a43d005c0c42079ceba68d9a49c28e0eeaa6c7"
+  },
+  "crewAIInc/crewAI": {
+    "branch": "main",
+    "checked_at": "2026-08-31T09:40:25.009050+00:00",
+    "sha": "da4daadba0e5049abc00fee8bc31b8b8019c60dd"
+  },
+  "gpt-engineer-org/gpt-engineer": {
+    "branch": "main",
+    "checked_at": "2026-08-31T09:40:25.546412+00:00",
+    "sha": "a90fcd543eedcc0ff2c34561bc0785d2ba83c47e"
+  }
+}
